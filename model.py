@@ -35,9 +35,10 @@ def input_distortion(images, isTraining, batch_size):
 
 class Model():
 
-    def __init__(self, sess, data, nEpochs, learning_rate_1, learning_rate_2, batch_size, is_supervised):
+    def __init__(self, sess, data, val_data, nEpochs, learning_rate_1, learning_rate_2, batch_size, is_supervised):
         self.sess = sess
         self.data = data #initialize this with Cifar.data
+        self.val_data = val_data
         self.nEpochs = nEpochs
         self.learning_rate_1 = learning_rate_1
         self.learning_rate_2 = learning_rate_2
@@ -61,10 +62,16 @@ class Model():
             self.L_hat_l2_loss = tf.reduce_mean(tf.pow(tf.abs(L - L_hat), 2))
 
             #TensorBoard Logging:
-            tf.summary.scalar('ab_hat L2 loss', self.ab_hat_l2_loss)
-            tf.summary.scalar('L hat l2 loss', self.L_hat_l2_loss)
-            self.merged = tf.summary.merge_all()
-            self.train_writer = tf.summary.FileWriter('./train_logs', self.sess.graph)
+            train_ab_sum = tf.summary.scalar('Training ab_hat L2 loss', self.ab_hat_l2_loss)
+            train_l_sum = tf.summary.scalar('Training L hat L2 loss', self.L_hat_l2_loss)
+
+            val_ab_sum = tf.summary.scalar('Val ab_hat L2 loss', self.ab_hat_l2_loss)
+            val_l_sum = tf.summary.scalar('Val L hat L2 loss', self.L_hat_l2_loss)
+
+            self.train_merged = tf.summary.merge([train_ab_sum, train_l_sum])
+            self.val_merged = tf.summary.merge([val_ab_sum, val_l_sum])
+
+            self.log_writer = tf.summary.FileWriter('./train_logs', self.sess.graph)
 
     def unsupervised_arch(self, images):
         images = input_distortion(images, self.isTraining, self.batch_size)
@@ -155,13 +162,30 @@ class Model():
                 raise ValueError("Do not supply labels for unsupervised training")
 
             ab_hat_l2_loss, L_hat_l2_loss, _, summary, ims = self.sess.run(
-                [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.optim, self.merged, self.images], 
+                [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.optim, self.train_merged, self.images], 
                 feed_dict = {self.x: x, self.isTraining: True}
                 )
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}'.format(ab_hat_l2_loss, L_hat_l2_loss))
-            self.train_writer.add_summary(summary, iteration)
+            self.log_writer.add_summary(summary, iteration)
             # plt.imshow(np.squeeze(ims[0]))
             # plt.show()
+
+    def info_iter(self, iteration, x, y=None):
+        if self.is_supervised:
+            if not y:
+                raise ValueError("Must supply labels for supervised training")
+
+            # NEED TO FILL IN
+        else:
+            if y:
+                raise ValueError("Do not supply labels for unsupervised training")
+
+            ab_hat_l2_loss, L_hat_l2_loss, summary = self.sess.run(
+                [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.val_merged],
+                feed_dict = {self.x: x, self.isTraining: False}
+                )
+            print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}'.format(ab_hat_l2_loss, L_hat_l2_loss))
+            self.log_writer.add_summary(summary, iteration)
 
     def train(self):
         iteration = 0
@@ -169,10 +193,16 @@ class Model():
             if self.is_supervised:
                 for x, y in self.data(self.batch_size, self.is_supervised):
                     self.train_iter(iteration, x, y)
+
+                    if iteration % 100 == 0:
+                        self.info_iter(iteration, x, y)
+
                     iteration += 1
             else:
                 for x in self.data(self.batch_size, self.is_supervised):
                     self.train_iter(iteration, x)
+
+                    if iteration % 100 == 0:
+                        self.info_iter(iteration, x)
                     iteration += 1
-
-
+                    
