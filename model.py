@@ -35,7 +35,7 @@ def input_distortion(images, isTraining, batch_size):
 
 class Model():
 
-    def __init__(self, sess, data, val_data, nEpochs, learning_rate_1, learning_rate_2, batch_size, is_supervised):
+    def __init__(self, sess, data, val_data, nEpochs, learning_rate_1, learning_rate_2, batch_size, is_supervised, saver):
         self.sess = sess
         self.data = data #initialize this with Cifar.data
         self.val_data = val_data
@@ -45,6 +45,7 @@ class Model():
         self.batch_size = batch_size
         self.is_supervised = is_supervised
         self.build_model(self.is_supervised)
+        self.saver = saver
 
     def build_model(self, is_supervised):
         self.x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
@@ -52,6 +53,15 @@ class Model():
         
         if is_supervised:
             self.y = tf.placeholder(tf.float32, shape=[None, 10])
+            result = self.unsupervised_arch(self.x)
+
+            self.L_feature_map = result[2]
+            self.ab_feature_map = result[3]
+
+            self.saver.restore(self.sess, "./model.ckpt")
+
+            result = supervised_arch(self.L_feature_map, self.ab_feature_map)
+
 
         if not is_supervised:
             result = self.unsupervised_arch(self.x)
@@ -70,8 +80,27 @@ class Model():
 
             self.train_merged = tf.summary.merge([train_ab_sum, train_l_sum])
             self.val_merged = tf.summary.merge([val_ab_sum, val_l_sum])
-
             self.log_writer = tf.summary.FileWriter('./train_logs', self.sess.graph)
+
+    
+    #TODO: MAKE SURE ABOUT VARIABLE COLLECTIONS WHEN PASSING TO TRAINING OP
+    #TODO: Check update collections, how to only pass a specific collection
+    #TODO: Figure out how to fetch specific variable names
+    def supervised_arch(self, L_feature_map, ab_feature_map):
+        self.total_features = tf.concat(
+            [Lfeature_map, ab_feature_map],
+            axis=3
+            ) # 12 x 12 x 128
+
+        with tf.variable_scope('Supervised'):
+            result = slim.layers.convolution(self.total_features, 64, [3, 3], scope='S_conv1') # 12 x 12 x 64
+            result = slim.layers.flatten(result)
+            result = slim.layers.fully_connected(net, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer())
+            result = slim.layers.dropout(net, keep_prob=0.5, is_training=self.isTraining)
+            result = slim.layers.fully_connected(net, 10, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
+                activation_fn=None)
+
+        return result
 
     def unsupervised_arch(self, images):
         images = input_distortion(images, self.isTraining, self.batch_size)
@@ -97,6 +126,9 @@ class Model():
             with tf.variable_scope('L_res2'):
                 ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
+            ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
+            ab_features = ab_hat
+
             ab_hat = slim.layers.convolution(ab_hat, 2, [1, 1], scope='L_conv3', activation_fn=None) # 12 x 12 x 2
 
         with slim.arg_scope([slim.layers.convolution], 
@@ -115,12 +147,15 @@ class Model():
             with tf.variable_scope('ab_res2'):
                 L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
+            ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED L FEATURES ###
+            L_features = L_hat
+
             L_hat = slim.layers.convolution(L_hat, 1, [1, 1], scope='ab_conv3', activation_fn=None) # 12 x 12 x 1
 
         L = tf.image.resize_bilinear(L, [12, 12])
         ab = tf.image.resize_bilinear(ab, [12, 12])
 
-        return [(L, ab, L_hat, ab_hat), images]
+        return [(L, ab, L_hat, ab_hat), images, L_features, ab_features]
 
     def train_init(self):
         model_variables = slim.get_variables()
@@ -187,7 +222,7 @@ class Model():
             print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}'.format(ab_hat_l2_loss, L_hat_l2_loss))
             self.log_writer.add_summary(summary, iteration)
 
-    def train(self):
+    def unsupervised_train(self):
         iteration = 0
         for epoch in range(self.nEpochs):
             if self.is_supervised:
@@ -205,4 +240,7 @@ class Model():
                     if iteration % 100 == 0:
                         self.info_iter(iteration, x)
                     iteration += 1
+
+        save_path = self.saver.save(self.sess, "./model.ckpt")
+        print("Model saved in file: %s" % save_path)
                     
