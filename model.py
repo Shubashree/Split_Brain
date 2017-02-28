@@ -45,7 +45,7 @@ def input_distortion(images, isTraining, batch_size):
 
 class Model():
 
-    def __init__(self, sess, data, val_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, is_supervised, saver):
+    def __init__(self, sess, data, val_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, is_supervised):
         self.sess = sess
         self.data = data #initialize this with Cifar.data
         self.val_data = val_data
@@ -56,7 +56,7 @@ class Model():
         self.batch_size = batch_size
         self.is_supervised = is_supervised
         self.build_model(self.is_supervised)
-        self.saver = saver
+        self.saver = tf.train.Saver()
 
     def build_model(self, is_supervised):
         self.x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
@@ -253,7 +253,7 @@ class Model():
             if y:
                 raise ValueError("Do not supply labels for unsupervised training")
 
-            ab_hat_l2_loss, L_hat_l2_loss, _, summary, ims = self.sess.run(log_writer
+            ab_hat_l2_loss, L_hat_l2_loss, _, summary, ims = self.sess.run(
                 [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.optim, self.train_merged, self.images], 
                 feed_dict = {self.x: x, self.isTraining: True}
                 )
@@ -287,7 +287,7 @@ class Model():
             print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}'.format(ab_hat_l2_loss, L_hat_l2_loss))
             self.log_writer.add_summary(summary, iteration)
 
-    def unsupervised_train(self):
+    def train(self):
         for iteration in range(self.num_iter):
             if self.is_supervised:
                 x, y= self.data(self.batch_size, self.is_supervised)
@@ -305,4 +305,5 @@ class Model():
 
         save_path = self.saver.save(self.sess, "./model.ckpt")
         print("Model saved in file: %s" % save_path)
+
                     

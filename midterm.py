@@ -18,8 +18,8 @@ model = Model(
 	uns_learning_rate_1=1e-2,
 	uns_learning_rate_2=1e-2,
 	batch_size=64,
-	is_supervised=False
+	is_supervised=False,
 	)
 
 model.train_init()
-model.unsupervised_train()
+model.train()
