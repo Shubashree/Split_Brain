@@ -68,33 +68,29 @@ class Cifar():
 
     def data(self, batch_size, is_supervised):
         if is_supervised:
-            for _ in range(int(len(self.train_images)/batch_size)):
-                indices = np.random.randint(0, len(self.train_images), size=batch_size)
-                x = self.train_images[indices]
-                y = self.train_labels[indices]
-                y = Cifar.one_hot(y, 10)
-                #plt.imshow(np.squeeze(x[0]))
-                #plt.show()
-                yield x, y
-
-        else:
-            for _ in range(int(len(self.train_images)/batch_size)):
-                indices = np.random.randint(0, len(self.train_images), size=batch_size)
-                x = self.train_images[indices]
-                #plt.imshow(np.squeeze(x[0]))
-                #plt.show()
-                yield x
-
-    def val_data(self, batch_size, is_supervised):
-        if is_supervised:
             indices = np.random.randint(0, len(self.train_images), size=batch_size)
             x = self.train_images[indices]
             y = self.train_labels[indices]
             y = Cifar.one_hot(y, 10)
-            yield x,y
+            return x, y
 
         else:
             indices = np.random.randint(0, len(self.train_images), size=batch_size)
             x = self.train_images[indices]
             #plt.imshow(np.squeeze(x[0]))
-            yield x
+            #plt.show()
+            return x
+
+    def val_data(self, batch_size, is_supervised):
+        if is_supervised:
+            indices = np.random.randint(0, len(self.val_images), size=batch_size)
+            x = self.val_images[indices]
+            y = self.val_labels[indices]
+            y = Cifar.one_hot(y, 10)
+            return x,y
+
+        else:
+            indices = np.random.randint(0, len(self.val_images), size=batch_size)
+            x = self.val_images[indices]
+            #plt.imshow(np.squeeze(x[0]))
+            return x
