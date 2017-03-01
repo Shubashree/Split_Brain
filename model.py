@@ -45,7 +45,8 @@ def input_distortion(images, isTraining, batch_size):
 
 class Model():
 
-    def __init__(self, sess, data, val_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, is_supervised):
+    def __init__(self, sess, data, val_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, 
+        is_supervised, is_untrained):
         self.sess = sess
         self.data = data #initialize this with Cifar.data
         self.val_data = val_data
@@ -56,9 +57,10 @@ class Model():
         self.batch_size = batch_size
         self.is_supervised = is_supervised
         self.build_model(self.is_supervised)
-        #self.sup_percentage = None
+        self.sup_percentage = None
+        self.is_untrained = is_untrained
 
-    def sup_percentage(self, percentage):
+    def change_sup_percentage(self, percentage):
         self.sup_percentage = percentage
 
     def build_model(self, is_supervised):
@@ -81,15 +83,27 @@ class Model():
             correct_prediction = tf.equal(tf.argmax(input=self.prediction, axis=1), tf.argmax(input=self.y, axis=1))
             self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-            train_loss_sum = tf.summary.scalar('Supervised Training Loss', self.sup_loss)
-            train_acc_sum = tf.summary.scalar('Supervised Training Accuracy', self.accuracy)
+            if is_untrained:
+                train_loss_sum = tf.summary.scalar('Supervised Untrained Training Loss', self.sup_loss)
+                train_acc_sum = tf.summary.scalar('Supervised Untrained Training Accuracy', self.accuracy)
 
-            val_loss_sum = tf.summary.scalar('Supervised Val Loss', self.sup_loss)
-            val_acc_sum = tf.summary.scalar('Supervised Val Accuracy', self.accuracy)
+                val_loss_sum = tf.summary.scalar('Supervised Untrained Val Loss', self.sup_loss)
+                val_acc_sum = tf.summary.scalar('Supervised Untrained Val Accuracy', self.accuracy)
 
-            self.train_merged = tf.summary.merge([train_loss_sum, train_acc_sum])
-            self.val_merged = tf.summary.merge([val_loss_sum, val_acc_sum])
-            self.log_writer = tf.summary.FileWriter('./train_sup_logs', self.sess.graph)
+                self.train_merged = tf.summary.merge([train_loss_sum, train_acc_sum])
+                self.val_merged = tf.summary.merge([val_loss_sum, val_acc_sum])
+                self.log_writer = tf.summary.FileWriter('./train_unt_sup_logs', self.sess.graph)                
+
+            else:     
+                train_loss_sum = tf.summary.scalar('Supervised Trained Training Loss', self.sup_loss)
+                train_acc_sum = tf.summary.scalar('Supervised Trained Training Accuracy', self.accuracy)
+
+                val_loss_sum = tf.summary.scalar('Supervised Trained Val Loss', self.sup_loss)
+                val_acc_sum = tf.summary.scalar('Supervised Trained Val Accuracy', self.accuracy)
+
+                self.train_merged = tf.summary.merge([train_loss_sum, train_acc_sum])
+                self.val_merged = tf.summary.merge([val_loss_sum, val_acc_sum])
+                self.log_writer = tf.summary.FileWriter('./train_tra_sup_logs', self.sess.graph)
 
         if not is_supervised:
             result = self.unsupervised_arch(self.x)
@@ -194,20 +208,35 @@ class Model():
 
     def train_init(self):
         if self.is_supervised:
-            update_ops = tf.get_collection('supervised_update_coll')
-            model_variables = tf.get_collection('supervised_var_coll')
-            if update_ops:
-                updates = tf.group(*update_ops)
-                self.optim = tf.group(updates,
-                    tf.train.AdamOptimizer(
-                        learning_rate=self.sup_learning_rate
+            if self.is_untrained:
+                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                if update_ops:
+                    updates = tf.group(*update_ops)
+                    self.optim = tf.group(updates,
+                        tf.train.AdamOptimizer(
+                            learning_rate=self.sup_learning_rate
+                            )
+                            .minimize(self.sup_loss)
                         )
-                        .minimize(self.sup_loss, var_list=model_variables)
-                    )
+                else:
+                    self.optim = tf.train.AdamOptimizer(
+                        learning_rate=self.sup_learning_rate,
+                        ).minimize(self.sup_loss)
             else:
-                self.optim = tf.train.AdamOptimizer(
-                    learning_rate=self.sup_learning_rate,
-                    ).minimize(self.sup_loss, var_list=model_variables)
+                update_ops = tf.get_collection('supervised_update_coll')
+                model_variables = tf.get_collection('supervised_var_coll')
+                if update_ops:
+                    updates = tf.group(*update_ops)
+                    self.optim = tf.group(updates,
+                        tf.train.AdamOptimizer(
+                            learning_rate=self.sup_learning_rate
+                            )
+                            .minimize(self.sup_loss, var_list=model_variables)
+                        )
+                else:
+                    self.optim = tf.train.AdamOptimizer(
+                        learning_rate=self.sup_learning_rate,
+                        ).minimize(self.sup_loss, var_list=model_variables)
 
         else:
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -238,7 +267,7 @@ class Model():
 
     def train_iter(self, iteration, x, y=None):
         if self.is_supervised:
-            if y == None:
+            if y is None:
                 raise ValueError("Must supply labels for supervised training")
             loss, _, accuracy, summary = self.sess.run(
                 [self.sup_loss, self.optim, self.accuracy, self.train_merged],
@@ -264,7 +293,7 @@ class Model():
 
     def info_iter(self, iteration, x, y=None):
         if self.is_supervised:
-            if y == None:
+            if y is None:
                 raise ValueError("Must supply labels for supervised training")
 
             loss, accuracy, summary = self.sess.run(
@@ -303,7 +332,8 @@ class Model():
                 if iteration % 100 == 0:
                     self.info_iter(iteration, x)
 
-        save_path = self.saver.save(self.sess, "./model.ckpt")
-        print("Model saved in file: %s" % save_path)
+        if not self.is_supervised:
+            save_path = self.saver.save(self.sess, "./model.ckpt")
+            print("Model saved in file: %s" % save_path)
 
                     

@@ -68,7 +68,7 @@ class Cifar():
 
     def data(self, batch_size, is_supervised, percentage=None):
         if is_supervised:
-            if percentage == None:
+            if not percentage is None:
                 length = len(self.train_images) * (percentage/100)
                 length = int(length)
             else:

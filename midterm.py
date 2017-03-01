@@ -13,13 +13,14 @@ model = Model(
 	sess=sess,
 	data=cifar_data.data,
 	val_data = cifar_data.val_data,
-	num_iter=100,
-	sup_learning_rate=None,
-	uns_learning_rate_1=1e-2,
-	uns_learning_rate_2=1e-2,
+	num_iter=50,
+	sup_learning_rate=1e-2,
+	uns_learning_rate_1=None,
+	uns_learning_rate_2=None,
 	batch_size=64,
-	is_supervised=False,
+	is_supervised=True,
 	)
 
+model.change_sup_percentage(10)
 model.train_init()
 model.train()
