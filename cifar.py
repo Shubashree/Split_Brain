@@ -66,9 +66,14 @@ class Cifar():
         self.trian_images = color.rgb2lab(self.train_images)
         self.test_images = color.rgb2lab(self.test_images)
 
-    def data(self, batch_size, is_supervised):
+    def data(self, batch_size, is_supervised, percentage=None):
         if is_supervised:
-            indices = np.random.randint(0, len(self.train_images), size=batch_size)
+            if percentage == None:
+                length = len(self.train_images) * (percentage/100)
+                length = int(length)
+            else:
+                length = len(self.train_images)
+            indices = np.random.randint(0, length, size=batch_size)
             x = self.train_images[indices]
             y = self.train_labels[indices]
             y = Cifar.one_hot(y, 10)

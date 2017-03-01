@@ -56,7 +56,10 @@ class Model():
         self.batch_size = batch_size
         self.is_supervised = is_supervised
         self.build_model(self.is_supervised)
-        self.saver = tf.train.Saver()
+        #self.sup_percentage = None
+
+    def sup_percentage(self, percentage):
+        self.sup_percentage = percentage
 
     def build_model(self, is_supervised):
         self.x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
@@ -69,9 +72,10 @@ class Model():
             self.L_feature_map = result[2]
             self.ab_feature_map = result[3]
 
+            self.saver = tf.train.Saver()
             self.saver.restore(self.sess, "./model.ckpt")
 
-            self.prediction = supervised_arch(self.L_feature_map, self.ab_feature_map)
+            self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
             self.sup_loss = tf.losses.get_total_loss()
             correct_prediction = tf.equal(tf.argmax(input=self.prediction, axis=1), tf.argmax(input=self.y, axis=1))
@@ -86,7 +90,6 @@ class Model():
             self.train_merged = tf.summary.merge([train_loss_sum, train_acc_sum])
             self.val_merged = tf.summary.merge([val_loss_sum, val_acc_sum])
             self.log_writer = tf.summary.FileWriter('./train_sup_logs', self.sess.graph)
-
 
         if not is_supervised:
             result = self.unsupervised_arch(self.x)
@@ -107,13 +110,14 @@ class Model():
             self.val_merged = tf.summary.merge([val_ab_sum, val_l_sum])
             self.log_writer = tf.summary.FileWriter('./train_uns_logs', self.sess.graph)
 
+            self.saver = tf.train.Saver()
     
     #TODO: MAKE SURE ABOUT VARIABLE COLLECTIONS WHEN PASSING TO TRAINING OP
     #TODO: Check update collections, how to only pass a specific collection
     #TODO: Figure out how to fetch specific variable names
     def supervised_arch(self, L_feature_map, ab_feature_map):
         self.total_features = tf.concat(
-            [Lfeature_map, ab_feature_map],
+            [L_feature_map, ab_feature_map],
             axis=3
             ) # 12 x 12 x 128
 
@@ -121,14 +125,14 @@ class Model():
             with slim. arg_scope([slim.layers.convolution, slim.layers.fully_connected],
                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
                 normalizer_fn = slim.layers.batch_norm,
-                normalizer_params = {'is_training': self.isTraining, 'updates_collection': 'supervised_update_coll'},
-                variables_collections = 'supervised_var_coll'
+                normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll']},
+                variables_collections = ['supervised_var_coll']
                 ):
                 result = slim.layers.convolution(self.total_features, 64, [3, 3], scope='S_conv1') # 12 x 12 x 64
                 result = slim.layers.flatten(result)
-                result = slim.layers.fully_connected(net, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer())
-                result = slim.layers.dropout(net, keep_prob=0.5, is_training=self.isTraining)
-                result = slim.layers.fully_connected(net, 10, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
+                result = slim.layers.fully_connected(result, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer())
+                result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
+                result = slim.layers.fully_connected(result, 10, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
                     activation_fn=None)
 
         return result
@@ -189,7 +193,6 @@ class Model():
         return [(L, ab, L_hat, ab_hat), images, L_features, ab_features]
 
     def train_init(self):
-
         if self.is_supervised:
             update_ops = tf.get_collection('supervised_update_coll')
             model_variables = tf.get_collection('supervised_var_coll')
@@ -197,20 +200,17 @@ class Model():
                 updates = tf.group(*update_ops)
                 self.optim = tf.group(updates,
                     tf.train.AdamOptimizer(
-                        learning_rate=self.sup_learning_rate,
-                        var_list=model_variables,
+                        learning_rate=self.sup_learning_rate
                         )
-                        .minimize(self.sup_loss)
+                        .minimize(self.sup_loss, var_list=model_variables)
                     )
             else:
                 self.optim = tf.train.AdamOptimizer(
                     learning_rate=self.sup_learning_rate,
-                    var_list=model_variables,
-                    )
+                    ).minimize(self.sup_loss, var_list=model_variables)
 
         else:
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-
             if update_ops:
                 updates = tf.group(*update_ops)
 
@@ -238,7 +238,7 @@ class Model():
 
     def train_iter(self, iteration, x, y=None):
         if self.is_supervised:
-            if not y:
+            if y == None:
                 raise ValueError("Must supply labels for supervised training")
             loss, _, accuracy, summary = self.sess.run(
                 [self.sup_loss, self.optim, self.accuracy, self.train_merged],
@@ -264,7 +264,7 @@ class Model():
 
     def info_iter(self, iteration, x, y=None):
         if self.is_supervised:
-            if not y:
+            if y == None:
                 raise ValueError("Must supply labels for supervised training")
 
             loss, accuracy, summary = self.sess.run(
@@ -290,7 +290,7 @@ class Model():
     def train(self):
         for iteration in range(self.num_iter):
             if self.is_supervised:
-                x, y= self.data(self.batch_size, self.is_supervised)
+                x, y= self.data(self.batch_size, self.is_supervised, self.sup_percentage)
                 self.train_iter(iteration, x, y)
 
                 if iteration % 100 == 0:
