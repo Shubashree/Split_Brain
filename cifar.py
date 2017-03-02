@@ -59,7 +59,7 @@ class Cifar():
         self.test_images = Cifar._convert_images(test_data_batch[b'data'], 3, 32)
         self.test_labels = np.array(test_data_batch[b'labels'])
 
-        print(self.test_images.shape)
+        #print(self.test_images.shape)
 
     def convert_to_lab(self):
         self.val_images = color.rgb2lab(self.val_images)
@@ -99,3 +99,21 @@ class Cifar():
             x = self.val_images[indices]
             #plt.imshow(np.squeeze(x[0]))
             return x
+
+    def test_data(self, test_size, is_supervised):
+        start = 0
+        print(len(self.test_images))
+        while start < len(self.test_images):
+            end = start + test_size
+            if end >= len(self.test_images):
+                end = len(self.test_images) - 1
+            x = self.test_images[start:end]
+            y = self.test_labels[start:end]
+            y = Cifar.one_hot(y, 10)
+
+            if is_supervised:
+                yield x, y
+            else:
+                yield x
+
+            start = start + end

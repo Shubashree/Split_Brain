@@ -45,20 +45,22 @@ def input_distortion(images, isTraining, batch_size):
 
 class Model():
 
-    def __init__(self, sess, data, val_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, 
-        is_supervised, is_untrained):
+    def __init__(self, sess, data, val_data, test_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, 
+        test_size, is_supervised, is_untrained):
         self.sess = sess
         self.data = data #initialize this with Cifar.data
         self.val_data = val_data
+        self.test_data = test_data
         self.num_iter = num_iter
         self.sup_learning_rate = sup_learning_rate
         self.uns_learning_rate_1 = uns_learning_rate_1
         self.uns_learning_rate_2 = uns_learning_rate_2
         self.batch_size = batch_size
+        self.test_size = test_size
         self.is_supervised = is_supervised
-        self.build_model(self.is_supervised)
         self.sup_percentage = None
         self.is_untrained = is_untrained
+        self.build_model(self.is_supervised)
 
     def change_sup_percentage(self, percentage):
         self.sup_percentage = percentage
@@ -80,10 +82,11 @@ class Model():
             self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
             self.sup_loss = tf.losses.get_total_loss()
-            correct_prediction = tf.equal(tf.argmax(input=self.prediction, axis=1), tf.argmax(input=self.y, axis=1))
-            self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            self.correct_prediction = tf.equal(tf.argmax(input=self.prediction, axis=1), tf.argmax(input=self.y, axis=1))
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+            self.total_corr = tf.reduce_sum(tf.cast(self.correct_prediction, tf.float32))
 
-            if is_untrained:
+            if self.is_untrained:
                 train_loss_sum = tf.summary.scalar('Supervised Untrained Training Loss', self.sup_loss)
                 train_acc_sum = tf.summary.scalar('Supervised Untrained Training Accuracy', self.accuracy)
 
@@ -273,8 +276,10 @@ class Model():
                 [self.sup_loss, self.optim, self.accuracy, self.train_merged],
                 feed_dict = {self.x: x, self.y: y, self.isTraining: True}
                 )
-
-            print('SUP--  loss: {0}, accuracy: {1}'.format(loss, accuracy))
+            if self.is_untrained:
+                print('SUPUN  loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
+            else:
+                print('SUP loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
             self.log_writer.add_summary(summary, iteration)
 
             # NEED TO FILL IN
@@ -301,7 +306,7 @@ class Model():
                 feed_dict = {self.x: x, self.y: y, self.isTraining:False}
                 )
 
-            print('SUP-- VAL: loss:{0}, accuracy: {1}'.format(loss, accuracy))
+            print('SUP-- VAL: loss:{0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
             self.log_writer.add_summary(summary, iteration)
 
             # NEED TO FILL IN
@@ -313,7 +318,7 @@ class Model():
                 [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.val_merged],
                 feed_dict = {self.x: x, self.isTraining: False}
                 )
-            print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}'.format(ab_hat_l2_loss, L_hat_l2_loss))
+            print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
 
     def train(self):
@@ -336,4 +341,25 @@ class Model():
             save_path = self.saver.save(self.sess, "./model.ckpt")
             print("Model saved in file: %s" % save_path)
 
-                    
+    def test(self):
+        if not self.is_supervised:
+            raise ValueError("Only Supervised Models can test")
+
+        if self.is_supervised:
+            total_corr = 0
+            for x, y in self.test_data(self.test_size, self.is_supervised):
+                total_corr += self.sess.run(
+                    self.total_corr,
+                    feed_dict={self.x: x, self.y: y, self.isTraining: False}
+                    )
+                print(total_corr)
+            print("TEST ACCURACY: {0}".format(total_corr*100/10000))
+            # if self.is_untrained:
+            #     print("Hi")
+            #     test_log_writer = tf.summary.FileWriter('./train_unt_sup_logs')
+            #     test_summary = tf.summary.scalar('Test Accuracy for Untrained Supervised Training', total_corr)
+            # else:
+            #     test_log_writer = tf.summary.FileWriter('./train_tra_sup_logs')
+            #     test_summary = tf.summary.scalar('Test Accuracy for Trained Supervised Training', total_corr)
+
+                
