@@ -75,9 +75,10 @@ class Model():
 
             self.L_feature_map = result[2]
             self.ab_feature_map = result[3]
-
-            self.saver = tf.train.Saver()
-            self.saver.restore(self.sess, "./model.ckpt")
+            
+            if not self.is_untrained:
+                self.saver = tf.train.Saver()
+                self.saver.restore(self.sess, "./model.ckpt")
 
             self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
