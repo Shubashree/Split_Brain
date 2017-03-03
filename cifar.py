@@ -63,7 +63,7 @@ class Cifar():
 
     def convert_to_lab(self):
         self.val_images = color.rgb2lab(self.val_images)
-        self.trian_images = color.rgb2lab(self.train_images)
+        self.train_images = color.rgb2lab(self.train_images)
         self.test_images = color.rgb2lab(self.test_images)
 
     def data(self, batch_size, is_supervised, percentage=None):

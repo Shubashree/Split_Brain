@@ -75,10 +75,10 @@ class Model():
 
             self.L_feature_map = result[2]
             self.ab_feature_map = result[3]
-            
+
             if not self.is_untrained:
                 self.saver = tf.train.Saver()
-                self.saver.restore(self.sess, "./saved_model/model.ckpt")
+                self.saver.restore(self.sess, "./saved_uns_model/model.ckpt")
 
             self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
@@ -86,6 +86,7 @@ class Model():
             self.correct_prediction = tf.equal(tf.argmax(input=self.prediction, axis=1), tf.argmax(input=self.y, axis=1))
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
             self.total_corr = tf.reduce_sum(tf.cast(self.correct_prediction, tf.float32))
+            self.sup_saver = tf.train.Saver()
 
             if self.is_untrained:
                 train_loss_sum = tf.summary.scalar('Supervised Untrained Training Loss', self.sup_loss)
@@ -339,8 +340,15 @@ class Model():
                     self.info_iter(iteration, x)
 
         if not self.is_supervised:
-            save_path = self.saver.save(self.sess, "./saved_model/model.ckpt")
-            print("Model saved in file: %s" % save_path)
+            save_path = self.saver.save(self.sess, "./saved_uns_model/model.ckpt")
+            print("Unsupervised Model saved in file: %s" % save_path)
+        else:
+            if self.is_untrained:
+                save_path = self.sup_saver.save(self.sess, "./saved_sup_unt_model/model.ckpt")
+                print("Supervised Untrained Model saved in file: %s" % save_path)
+            else:
+                save_path = self.sup_saver.save(self.sess, "./saved_sup_tra_model/model.ckpt")
+                print("Supervised Trained Model saved in file: %s" % save_path)
 
     def test(self):
         if not self.is_supervised:

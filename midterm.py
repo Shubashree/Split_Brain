@@ -6,7 +6,7 @@ from cifar import Cifar
 from model import Model
 
 cifar_data = Cifar('../hw3/cifar10')
-cifar_data.convert_to_lab
+cifar_data.convert_to_lab()
 
 sess = tf.Session()
 model = Model(
@@ -14,12 +14,12 @@ model = Model(
 	data=cifar_data.data,
 	val_data = cifar_data.val_data,
 	test_data = cifar_data.test_data,
-	num_iter=10000,
+	num_iter=30,
 	sup_learning_rate=1e-2,
 	uns_learning_rate_1=None,
 	uns_learning_rate_2=None,
 	batch_size=64,
-	test_size=1000,
+	test_size=100,
 	is_supervised=True,
 	is_untrained=True
 	)
