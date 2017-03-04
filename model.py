@@ -157,10 +157,10 @@ class Model():
         return result
 
     def unsupervised_arch(self, images):
-        #images = input_distortion(images, self.isTraining, self.batch_size)
-        L = tf.reshape(images[:, :, :, 0], shape=[-1, 32, 32, 1])
+        images = input_distortion(images, self.isTraining, self.batch_size)
+        L = tf.reshape(images[:, :, :, 0], shape=[-1, 24, 24, 1])
         ab = tf.concat(
-            [tf.reshape(images[:, :, :, 1], shape=[-1, 32, 32, 1]), tf.reshape(images[:, :, :, 2], shape=[-1, 32, 32, 1])],
+            [tf.reshape(images[:, :, :, 1], shape=[-1, 24, 24, 1]), tf.reshape(images[:, :, :, 2], shape=[-1, 24, 24, 1])],
             axis=3
             )
 
@@ -206,8 +206,8 @@ class Model():
 
             L_hat = slim.layers.convolution(L_hat, 1, [1, 1], scope='ab_conv3', activation_fn=None) # 12 x 12 x 1
 
-        L = tf.image.resize_bilinear(L, [16, 16])
-        ab = tf.image.resize_bilinear(ab, [16, 16])
+        L = tf.image.resize_bilinear(L, [12, 12)
+        ab = tf.image.resize_bilinear(ab, [12 12)
 
         return [(L, ab, L_hat, ab_hat), images, L_features, ab_features]
 
