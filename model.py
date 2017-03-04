@@ -207,7 +207,7 @@ class Model():
             L_hat = slim.layers.convolution(L_hat, 1, [1, 1], scope='ab_conv3', activation_fn=None) # 12 x 12 x 1
 
         L = tf.image.resize_bilinear(L, [12, 12])
-        ab = tf.image.resize_bilinear(ab, [12 12])
+        ab = tf.image.resize_bilinear(ab, [12, 12])
 
         return [(L, ab, L_hat, ab_hat), images, L_features, ab_features]
 
