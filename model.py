@@ -160,7 +160,7 @@ class Model():
         #images = input_distortion(images, self.isTraining, self.batch_size)
         L = tf.reshape(images[:, :, :, 0], shape=[-1, 32, 32, 1])
         ab = tf.concat(
-            [tf.reshape(images[:, :, :, 1], shape=[-1, 32, 32, 1]), tf.reshape(images[:, :, :, 2], shape=[-1, 24, 24, 1])],
+            [tf.reshape(images[:, :, :, 1], shape=[-1, 32, 32, 1]), tf.reshape(images[:, :, :, 2], shape=[-1, 32, 32, 1])],
             axis=3
             )
 
