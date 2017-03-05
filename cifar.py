@@ -6,6 +6,8 @@ from skimage import color
 import pickle
 import os
 
+np.random.seed(31415)
+
 class Cifar():
 
     def one_hot(labels, size):
@@ -67,9 +69,16 @@ class Cifar():
         lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 108
         return lab_images
 
+    def denormalize_image(lab_image):
+        lab_image[:, :, 0] = lab_image[:, :, 0] * 100
+        lab_image[:, :, 1] = lab_image[:, :, 1] * 99
+        lab_image[:, :, 2] = lab_image[:, :, 2] * 108
+        return lab_image
+
     def convert_to_lab(self):
         self.val_images = color.rgb2lab(self.val_images)
         self.train_images = color.rgb2lab(self.train_images)
+        np.random.shuffle(self.train_images)
         self.test_images = color.rgb2lab(self.test_images)
 
         self.val_images = Cifar.normalize(self.val_images)

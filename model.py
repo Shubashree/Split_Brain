@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import tensorflow.contrib.slim as slim
+from skimage import color
+from cifar import Cifar
 
 
 ###########################################################
@@ -75,6 +77,8 @@ class Model():
 
             self.L_feature_map = result[2]
             self.ab_feature_map = result[3]
+            print(self.L_feature_map.get_shape())
+            print(self.ab_feature_map.get_shape())
 
             if not self.is_untrained:
                 self.saver = tf.train.Saver()
@@ -82,7 +86,9 @@ class Model():
 
             self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
+
             self.sup_loss = tf.losses.get_total_loss()
+            self.reg_loss = tf.losses.get_regularization_losses()
             self.correct_prediction = tf.equal(tf.argmax(input=self.prediction, axis=1), tf.argmax(input=self.y, axis=1))
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
             self.total_corr = tf.reduce_sum(tf.cast(self.correct_prediction, tf.float32))
@@ -114,7 +120,7 @@ class Model():
             result = self.unsupervised_arch(self.x)
             L, ab, L_hat, ab_hat = (slim.layers.flatten(x) for x in result[0])
             #L, ab, L_hat, ab_hat = result[0]
-            self.images = result[1]
+            self.images = self.x
             self.ab_hat_l2_loss = tf.reduce_mean(tf.pow(tf.abs(ab - ab_hat), 2))
             self.L_hat_l2_loss = tf.reduce_mean(tf.pow(tf.abs(L - L_hat), 2))
 
@@ -150,7 +156,8 @@ class Model():
                 result = slim.layers.convolution(self.total_features, 64, [3, 3], scope='S_conv1') # 12 x 12 x 64
                 result = residual(result, 64, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(result)
-                result = slim.layers.fully_connected(result, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer())
+                result = slim.layers.fully_connected(result, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
+                    weights_regularizer=tf.contrib.layers.l2_regularizer(1e-5))
                 result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
                 result = slim.layers.fully_connected(result, 10, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
                     activation_fn=None)
@@ -158,10 +165,10 @@ class Model():
         return result
 
     def unsupervised_arch(self, images):
-        images = input_distortion(images, self.isTraining, self.batch_size)
-        L = tf.reshape(images[:, :, :, 0], shape=[-1, 24, 24, 1])
+        #images = input_distortion(images, self.isTraining, self.batch_size)
+        L = tf.reshape(images[:, :, :, 0], shape=[-1, 32, 32, 1])
         ab = tf.concat(
-            [tf.reshape(images[:, :, :, 1], shape=[-1, 24, 24, 1]), tf.reshape(images[:, :, :, 2], shape=[-1, 24, 24, 1])],
+            [tf.reshape(images[:, :, :, 1], shape=[-1, 32, 32, 1]), tf.reshape(images[:, :, :, 2], shape=[-1, 32, 32, 1])],
             axis=3
             )
 
@@ -184,7 +191,8 @@ class Model():
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
             ab_features = ab_hat
 
-            ab_hat = slim.layers.convolution(ab_hat, 2, [1, 1], scope='L_conv3', activation_fn=None) # 12 x 12 x 2
+            ab_hat = slim.layers.convolution(ab_hat, 2, [1, 1], scope='L_conv3', activation_fn=None,
+                normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 2
 
         with slim.arg_scope([slim.layers.convolution], 
             padding='SAME',
@@ -205,10 +213,11 @@ class Model():
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED L FEATURES ###
             L_features = L_hat
 
-            L_hat = slim.layers.convolution(L_hat, 1, [1, 1], scope='ab_conv3', activation_fn=None) # 12 x 12 x 1
+            L_hat = slim.layers.convolution(L_hat, 1, [1, 1], scope='ab_conv3', activation_fn=None,
+                normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 1
 
-        L = tf.image.resize_bilinear(L, [12, 12])
-        ab = tf.image.resize_bilinear(ab, [12, 12])
+        L = tf.image.resize_bilinear(L, [16, 16])
+        ab = tf.image.resize_bilinear(ab, [16, 16])
 
         return [(L, ab, L_hat, ab_hat), images, L_features, ab_features]
 
@@ -275,14 +284,14 @@ class Model():
         if self.is_supervised:
             if y is None:
                 raise ValueError("Must supply labels for supervised training")
-            loss, _, accuracy, summary = self.sess.run(
-                [self.sup_loss, self.optim, self.accuracy, self.train_merged],
+            loss, reg_loss, _, accuracy, summary = self.sess.run(
+                [self.sup_loss, self.reg_loss, self.optim, self.accuracy, self.train_merged],
                 feed_dict = {self.x: x, self.y: y, self.isTraining: True}
                 )
             if self.is_untrained:
-                print('SUPUN  loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
+                print('SUPUN  loss: {0}, reg_loss: {3} accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
             else:
-                print('SUPTRA loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
+                print('SUPTRA loss: {0}, reg_loss: {3} accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
             self.log_writer.add_summary(summary, iteration)
 
             # NEED TO FILL IN
@@ -296,7 +305,8 @@ class Model():
                 )
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
-            # plt.imshow(np.squeeze(ims[0]))
+            # print(np.amin(ims[0]), np.amax(ims[0]))
+            # plt.imshow(color.lab2rgb(ims[0]))
             # plt.show()
 
     def info_iter(self, iteration, x, y=None):
@@ -304,12 +314,12 @@ class Model():
             if y is None:
                 raise ValueError("Must supply labels for supervised training")
 
-            loss, accuracy, summary = self.sess.run(
-                [self.sup_loss, self.accuracy, self.val_merged],
-                feed_dict = {self.x: x, self.y: y, self.isTraining:False}
+            loss, reg_loss, accuracy, summary = self.sess.run(
+                [self.sup_loss, self.reg_loss, self.accuracy, self.val_merged],
+                feed_dict = {self.x: x, self.y: y, self.isTraining: False}
                 )
 
-            print('SUP-- VAL: loss:{0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
+            print('SUP-- VAL: loss:{0}, reg_loss: {3}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
             self.log_writer.add_summary(summary, iteration)
 
             # NEED TO FILL IN
@@ -335,6 +345,9 @@ class Model():
 
             else:
                 x = self.data(self.batch_size, self.is_supervised)
+                # print("X: min: {0}, max: {1}".format(np.amin(x[0]), np.amax(x[0])))
+                # plt.imshow((color.lab2rgb(x[0])))
+                # plt.show()
                 self.train_iter(iteration, x)
 
                 if iteration % 100 == 0:
