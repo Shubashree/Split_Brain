@@ -61,10 +61,20 @@ class Cifar():
 
         #print(self.test_images.shape)
 
+    def normalize(lab_images):
+        lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / 100
+        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / 99
+        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 108
+        return lab_images
+
     def convert_to_lab(self):
         self.val_images = color.rgb2lab(self.val_images)
         self.train_images = color.rgb2lab(self.train_images)
         self.test_images = color.rgb2lab(self.test_images)
+
+        self.val_images = Cifar.normalize(self.val_images)
+        self.train_images = Cifar.normalize(self.train_images)
+        self.test_images = Cifar.normalize(self.test_images) 
 
     def data(self, batch_size, is_supervised, percentage=None):
         if is_supervised:
@@ -103,10 +113,13 @@ class Cifar():
     def test_data(self, test_size, is_supervised):
         start = 0
         print(len(self.test_images))
-        while start < len(self.test_images):
+        cont = True
+        while cont:
             end = start + test_size
             if end >= len(self.test_images):
                 end = len(self.test_images) - 1
+                cont = False
+            print("start: {0}, end: {1}".format(start, end))
             x = self.test_images[start:end]
             y = self.test_labels[start:end]
             y = Cifar.one_hot(y, 10)
@@ -116,4 +129,4 @@ class Cifar():
             else:
                 yield x
 
-            start = start + end
+            start = end

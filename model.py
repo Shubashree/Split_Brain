@@ -148,6 +148,7 @@ class Model():
                 variables_collections = ['supervised_var_coll']
                 ):
                 result = slim.layers.convolution(self.total_features, 64, [3, 3], scope='S_conv1') # 12 x 12 x 64
+                result = residual(result, 64, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(result)
                 result = slim.layers.fully_connected(result, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer())
                 result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
@@ -281,7 +282,7 @@ class Model():
             if self.is_untrained:
                 print('SUPUN  loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
             else:
-                print('SUP loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
+                print('SUPTRA loss: {0}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration))
             self.log_writer.add_summary(summary, iteration)
 
             # NEED TO FILL IN

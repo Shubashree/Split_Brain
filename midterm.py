@@ -14,14 +14,14 @@ model = Model(
 	data=cifar_data.data,
 	val_data = cifar_data.val_data,
 	test_data = cifar_data.test_data,
-	num_iter=30,
+	num_iter=200,
 	sup_learning_rate=1e-2,
 	uns_learning_rate_1=None,
 	uns_learning_rate_2=None,
 	batch_size=64,
 	test_size=100,
 	is_supervised=True,
-	is_untrained=True
+	is_untrained=False
 	)
 
 model.change_sup_percentage(10)
