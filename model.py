@@ -160,7 +160,8 @@ class Model():
                     weights_regularizer=tf.contrib.layers.l2_regularizer(1e-5))
                 result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
                 result = slim.layers.fully_connected(result, 10, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
-                    activation_fn=None)
+                    activation_fn=None, normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'],
+                                                            'scale' : True})
 
         return result
 
