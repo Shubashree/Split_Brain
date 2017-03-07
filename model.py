@@ -83,6 +83,7 @@ class Model():
             if not self.is_untrained:
                 self.saver = tf.train.Saver()
                 self.saver.restore(self.sess, "./saved_uns_model/model.ckpt")
+                print("Restored Unsupervised Network")
 
             self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
@@ -154,14 +155,11 @@ class Model():
                 variables_collections = ['supervised_var_coll']
                 ):
                 result = slim.layers.convolution(self.total_features, 64, [3, 3], scope='S_conv1') # 12 x 12 x 64
-                result = residual(result, 64, [3, 3], 0.5, self.isTraining, True, True)
+                #result = residual(result, 64, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(result)
-                result = slim.layers.fully_connected(result, 1024, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
-                    weights_regularizer=tf.contrib.layers.l2_regularizer(1e-5))
+                result = slim.layers.fully_connected(result, 1024, weights_regularizer=tf.contrib.layers.l2_regularizer(1e-8))
                 result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
-                result = slim.layers.fully_connected(result, 10, weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
-                    activation_fn=None, normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'],
-                    'scale' : True})
+                result = slim.layers.fully_connected(result, 10, activation_fn=None)
 
         return result
 
@@ -250,6 +248,7 @@ class Model():
                             .minimize(self.sup_loss, var_list=model_variables)
                         )
                 else:
+                    print("NO UPDATE")
                     self.optim = tf.train.AdamOptimizer(
                         learning_rate=self.sup_learning_rate,
                         ).minimize(self.sup_loss, var_list=model_variables)
@@ -367,7 +366,12 @@ class Model():
 
     def test(self):
         if not self.is_supervised:
-            raise ValueError("Only Supervised Models can test")
+            for x in self.test_data(self.test_size, self.is_supervised):
+                ab_hat_loss, l_hat_loss = self.sess.run(
+                    [self.ab_hat_l2_loss, self.L_hat_l2_loss],
+                    feed_dict={self.x : x, self.isTraining: False}
+                    )
+                print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
 
         if self.is_supervised:
             total_corr = 0
@@ -378,12 +382,4 @@ class Model():
                     )
                 print(total_corr)
             print("TEST ACCURACY: {0}".format(total_corr*100/10000))
-            # if self.is_untrained:
-            #     print("Hi")
-            #     test_log_writer = tf.summary.FileWriter('./train_unt_sup_logs')
-            #     test_summary = tf.summary.scalar('Test Accuracy for Untrained Supervised Training', total_corr)
-            # else:
-            #     test_log_writer = tf.summary.FileWriter('./train_tra_sup_logs')
-            #     test_summary = tf.summary.scalar('Test Accuracy for Trained Supervised Training', total_corr)
-
                 
