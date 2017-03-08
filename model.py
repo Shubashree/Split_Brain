@@ -368,7 +368,7 @@ class Model():
                 if iteration % 100 == 0:
                     self.info_iter(iteration, x, y)
 
-		if iteration % 1000 == 0:
+                if iteration % 1000 == 0:
                     self.test()
 
             else:
