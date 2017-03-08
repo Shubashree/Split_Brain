@@ -19,7 +19,8 @@ def residual(net, num_filt, kernel_size, keepProb, isTraining, isFirst, isLast):
     with slim.arg_scope([slim.layers.convolution], 
         padding='SAME',
         weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
-        activation_fn=None
+        activation_fn=None,
+        normalizer_fn=None
         ):
 
         if isFirst:
@@ -70,6 +71,7 @@ class Model():
     def build_model(self, is_supervised):
         self.x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
         self.isTraining = tf.placeholder(tf.bool, shape=[])
+        #self.iteration = tf.Variable(tf.zeros([]), name='iteration')
         
         if is_supervised:
             self.y = tf.placeholder(tf.float32, shape=[None, 10])
@@ -82,8 +84,6 @@ class Model():
 
             if not self.is_untrained:
                 self.saver = tf.train.Saver()
-                self.saver.restore(self.sess, "./saved_uns_model/model.ckpt")
-                print("Restored Unsupervised Network")
 
             self.prediction = self.supervised_arch(self.L_feature_map, self.ab_feature_map)
             tf.losses.softmax_cross_entropy(onehot_labels=self.y, logits=self.prediction)
@@ -151,11 +151,11 @@ class Model():
             with slim. arg_scope([slim.layers.convolution, slim.layers.fully_connected],
                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
                 normalizer_fn = slim.layers.batch_norm,
-                normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll']},
+                normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'], 'scale': True},
                 variables_collections = ['supervised_var_coll']
                 ):
-                result = slim.layers.convolution(self.total_features, 64, [3, 3], scope='S_conv1') # 12 x 12 x 64
-                #result = residual(result, 64, [3, 3], 0.5, self.isTraining, True, True)
+                result = slim.layers.convolution(self.total_features, 256, [3, 3], scope='S_conv1') # 12 x 12 x 64
+                result = residual(result, 256, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(result)
                 result = slim.layers.fully_connected(result, 1024, weights_regularizer=tf.contrib.layers.l2_regularizer(1e-8))
                 result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
@@ -280,21 +280,30 @@ class Model():
 
         self.sess.run(tf.global_variables_initializer())
 
+        if self.is_supervised and not self.is_untrained:
+            self.saver.restore(self.sess, './saved_uns_model/model.ckpt')
+
     def train_iter(self, iteration, x, y=None):
         if self.is_supervised:
             if y is None:
                 raise ValueError("Must supply labels for supervised training")
-            loss, reg_loss, _, accuracy, summary = self.sess.run(
-                [self.sup_loss, self.reg_loss, self.optim, self.accuracy, self.train_merged],
+
+            with tf.variable_scope("L_conv2", reuse=True):
+                weigh = tf.get_variable("weights")
+
+            mod_iter, loss, reg_loss, _, accuracy, summary = self.sess.run(
+                [weigh, self.sup_loss, self.reg_loss, self.optim, self.accuracy, self.train_merged],
                 feed_dict = {self.x: x, self.y: y, self.isTraining: True}
                 )
+
+            print("MOD_ITER: {0}".format(mod_iter))
+
             if self.is_untrained:
                 print('SUPUN  loss: {0}, reg_loss: {3} accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
             else:
                 print('SUPTRA loss: {0}, reg_loss: {3} accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
-            self.log_writer.add_summary(summary, iteration)
 
-            # NEED TO FILL IN
+            self.log_writer.add_summary(summary, iteration)
         else:
             if y:
                 raise ValueError("Do not supply labels for unsupervised training")
@@ -303,6 +312,8 @@ class Model():
                 [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.optim, self.train_merged, self.images], 
                 feed_dict = {self.x: x, self.isTraining: True}
                 )
+
+            print('MOD_ITER: {0}'.format(mod_iter))
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
             # print(np.amin(ims[0]), np.amax(ims[0]))
@@ -321,8 +332,6 @@ class Model():
 
             print('SUP-- VAL: loss:{0}, reg_loss: {3}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
             self.log_writer.add_summary(summary, iteration)
-
-            # NEED TO FILL IN
         else:
             if y:
                 raise ValueError("Do not supply labels for unsupervised training")
@@ -382,4 +391,3 @@ class Model():
                     )
                 print(total_corr)
             print("TEST ACCURACY: {0}".format(total_corr*100/10000))
-                
