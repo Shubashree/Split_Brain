@@ -368,6 +368,9 @@ class Model():
                 if iteration % 100 == 0:
                     self.info_iter(iteration, x, y)
 
+		if iteration % 1000 == 0:
+                    self.test()
+
             else:
                 x = self.data(self.batch_size, self.is_supervised)
                 # print("X: min: {0}, max: {1}".format(np.amin(x[0]), np.amax(x[0])))
