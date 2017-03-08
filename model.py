@@ -291,16 +291,11 @@ class Model():
             if y is None:
                 raise ValueError("Must supply labels for supervised training")
 
-            with tf.variable_scope("L_conv2", reuse=True):
-                weigh = tf.get_variable("weights")
-
-            mod_iter, loss, reg_loss, _, accuracy, summary = self.sess.run(
-                [weigh, self.sup_loss, self.reg_loss, self.optim, self.accuracy, self.train_merged],
+            loss, reg_loss, _, accuracy, summary = self.sess.run(
+                [self.sup_loss, self.reg_loss, self.optim, self.accuracy, self.train_merged],
                 feed_dict = {self.x: x, self.y: y, self.isTraining: True}
                 )
-
-            print("MOD_ITER: {0}".format(mod_iter))
-
+            
             if self.is_untrained:
                 print('SUPUN  loss: {0}, reg_loss: {3} accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
             else:
@@ -315,7 +310,7 @@ class Model():
                 [self.ab_hat_l2_loss, self.L_hat_l2_loss, self.optim, self.train_merged, self.images], 
                 feed_dict = {self.x: x, self.isTraining: True}
                 )
-
+            
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
             # print(np.amin(ims[0]), np.amax(ims[0]))
