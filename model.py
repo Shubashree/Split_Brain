@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import tensorflow.contrib.slim as slim
 from skimage import color
 from cifar import Cifar
+from time import gmtime, strftime
 
 
 ###########################################################
@@ -20,7 +21,8 @@ def residual(net, num_filt, kernel_size, keepProb, isTraining, isFirst, isLast):
         padding='SAME',
         weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
         activation_fn=None,
-        normalizer_fn=None
+        normalizer_fn=None,
+        biases_initializer=None
         ):
 
         if isFirst:
@@ -63,6 +65,7 @@ class Model():
         self.is_supervised = is_supervised
         self.sup_percentage = None
         self.is_untrained = is_untrained
+        self.time = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         self.build_model(self.is_supervised)
 
     def change_sup_percentage(self, percentage):
@@ -104,7 +107,7 @@ class Model():
 
                 self.train_merged = tf.summary.merge([train_loss_sum, train_acc_sum])
                 self.val_merged = tf.summary.merge([val_loss_sum, val_acc_sum])
-                self.log_writer = tf.summary.FileWriter('./train_unt_sup_logs', self.sess.graph)                
+                self.log_writer = tf.summary.FileWriter('./train_unt_sup_logs/'+self.time, self.sess.graph)                
 
             else:     
                 train_loss_sum = tf.summary.scalar('Supervised Trained Training Loss', self.sup_loss)
@@ -115,7 +118,7 @@ class Model():
 
                 self.train_merged = tf.summary.merge([train_loss_sum, train_acc_sum])
                 self.val_merged = tf.summary.merge([val_loss_sum, val_acc_sum])
-                self.log_writer = tf.summary.FileWriter('./train_tra_sup_logs', self.sess.graph)
+                self.log_writer = tf.summary.FileWriter('./train_tra_sup_logs/'+self.time, self.sess.graph)
 
         if not is_supervised:
             result = self.unsupervised_arch(self.x)
@@ -134,7 +137,7 @@ class Model():
 
             self.train_merged = tf.summary.merge([train_ab_sum, train_l_sum])
             self.val_merged = tf.summary.merge([val_ab_sum, val_l_sum])
-            self.log_writer = tf.summary.FileWriter('./train_uns_logs', self.sess.graph)
+            self.log_writer = tf.summary.FileWriter('./train_uns_logs/'+self.time, self.sess.graph)
 
             self.saver = tf.train.Saver()
     
@@ -150,16 +153,16 @@ class Model():
         with tf.variable_scope('Supervised'):
             with slim. arg_scope([slim.layers.convolution, slim.layers.fully_connected],
                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
-                normalizer_fn = slim.layers.batch_norm,
-                normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'], 'scale': True},
+                #normalizer_fn = slim.layers.batch_norm,
+                #normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'], 'scale': True},
                 variables_collections = ['supervised_var_coll']
                 ):
-                result = slim.layers.convolution(self.total_features, 256, [3, 3], scope='S_conv1') # 12 x 12 x 64
-                result = residual(result, 256, [3, 3], 0.5, self.isTraining, True, True)
+                result = slim.layers.convolution(self.total_features, 32, [3, 3], scope='S_conv1') # 12 x 12 x 64
+                result = residual(result, 32, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(result)
                 result = slim.layers.fully_connected(result, 1024, weights_regularizer=tf.contrib.layers.l2_regularizer(1e-8))
                 result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
-                result = slim.layers.fully_connected(result, 10, activation_fn=None)
+                result = slim.layers.fully_connected(result, 10, activation_fn=None, normalizer_fn=None)
 
         return result
 
@@ -313,7 +316,6 @@ class Model():
                 feed_dict = {self.x: x, self.isTraining: True}
                 )
 
-            print('MOD_ITER: {0}'.format(mod_iter))
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
             # print(np.amin(ims[0]), np.amax(ims[0]))
@@ -343,6 +345,25 @@ class Model():
             print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
 
+    def test(self):
+        if not self.is_supervised:
+            for x in self.test_data(self.test_size, self.is_supervised):
+                ab_hat_loss, l_hat_loss = self.sess.run(
+                    [self.ab_hat_l2_loss, self.L_hat_l2_loss],
+                    feed_dict={self.x : x, self.isTraining: False}
+                    )
+                print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
+
+        if self.is_supervised:
+            total_corr = 0
+            for x, y in self.test_data(self.test_size, self.is_supervised):
+                total_corr += self.sess.run(
+                    self.total_corr,
+                    feed_dict={self.x: x, self.y: y, self.isTraining: False}
+                    )
+                print(total_corr)
+            print("TEST ACCURACY: {0}".format(total_corr*100/10000))
+
     def train(self):
         for iteration in range(self.num_iter):
             if self.is_supervised:
@@ -362,6 +383,9 @@ class Model():
                 if iteration % 100 == 0:
                     self.info_iter(iteration, x)
 
+                if iteration % 1000 == 0:
+                    self.test()
+
         if not self.is_supervised:
             save_path = self.saver.save(self.sess, "./saved_uns_model/model.ckpt")
             print("Unsupervised Model saved in file: %s" % save_path)
@@ -372,22 +396,3 @@ class Model():
             else:
                 save_path = self.sup_saver.save(self.sess, "./saved_sup_tra_model/model.ckpt")
                 print("Supervised Trained Model saved in file: %s" % save_path)
-
-    def test(self):
-        if not self.is_supervised:
-            for x in self.test_data(self.test_size, self.is_supervised):
-                ab_hat_loss, l_hat_loss = self.sess.run(
-                    [self.ab_hat_l2_loss, self.L_hat_l2_loss],
-                    feed_dict={self.x : x, self.isTraining: False}
-                    )
-                print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
-
-        if self.is_supervised:
-            total_corr = 0
-            for x, y in self.test_data(self.test_size, self.is_supervised):
-                total_corr += self.sess.run(
-                    self.total_corr,
-                    feed_dict={self.x: x, self.y: y, self.isTraining: False}
-                    )
-                print(total_corr)
-            print("TEST ACCURACY: {0}".format(total_corr*100/10000))
