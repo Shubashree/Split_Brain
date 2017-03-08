@@ -20,7 +20,8 @@ def residual(net, num_filt, kernel_size, keepProb, isTraining, isFirst, isLast):
         padding='SAME',
         weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
         activation_fn=None,
-        normalizer_fn=None
+        normalizer_fn=None,
+        biases_initializer=None
         ):
 
         if isFirst:
@@ -313,7 +314,7 @@ class Model():
                 feed_dict = {self.x: x, self.isTraining: True}
                 )
 
-            print('MOD_ITER: {0}'.format(mod_iter))
+            
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_l2_loss, L_hat_l2_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
             # print(np.amin(ims[0]), np.amax(ims[0]))
