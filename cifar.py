@@ -64,26 +64,39 @@ class Cifar():
         #print(self.test_images.shape)
 
     def normalize(lab_images):
-        lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / 100
-        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / 99
-        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 108
+        lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / 100.0
+        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / 99.0
+        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 108.0
         return lab_images
 
     def denormalize_image(lab_image):
-        lab_image[:, :, 0] = lab_image[:, :, 0] * 100
-        lab_image[:, :, 1] = lab_image[:, :, 1] * 99
-        lab_image[:, :, 2] = lab_image[:, :, 2] * 108
+        lab_image[:, :, 0] = lab_image[:, :, 0] * 100.0
+        lab_image[:, :, 1] = lab_image[:, :, 1] * 99.0
+        lab_image[:, :, 2] = lab_image[:, :, 2] * 108.0
         return lab_image
+
+    def quantize(lab_images):
+        lab_images[:, :, :, 0] = np.digitize(lab_images[:, :, :, 0], np.linspace(0, 101, 100))
+        lab_images[:, :, :, 1] = np.digitize(lab_images[:, :, :, 1], np.linspace(-88, 99, 200))
+        lab_images[:, :, :, 2] = np.digitize(lab_images[:, :, :, 2], np.linspace(-108, 95, 200))
+        return lab_images
 
     def convert_to_lab(self):
         self.val_images = color.rgb2lab(self.val_images)
         self.train_images = color.rgb2lab(self.train_images)
         np.random.shuffle(self.train_images)
         self.test_images = color.rgb2lab(self.test_images)
+        #print(self.val_images[0])
+
+        # self.quantized_val_images = Cifar.quantize(self.val_images)
+        # self.quantized_train_images = Cifar.quantize(self.train_images)
+        # self.quantized_test_images = Cifar.quantize(self.test_images)
+        #print(self.quantized_val_images[0])
 
         self.val_images = Cifar.normalize(self.val_images)
         self.train_images = Cifar.normalize(self.train_images)
-        self.test_images = Cifar.normalize(self.test_images) 
+        self.test_images = Cifar.normalize(self.test_images)
+        #print(self.val_images[0]) 
 
     def data(self, batch_size, is_supervised, percentage=None):
         if is_supervised:
