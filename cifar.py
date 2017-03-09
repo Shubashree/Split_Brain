@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from skimage import color
+from skimage import transform
 
 import pickle
 import os
@@ -65,8 +66,8 @@ class Cifar():
 
     def normalize(lab_images):
         lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / 100.0
-        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / 99.0
-        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 108.0
+        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / 100
+        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 100
         return lab_images
 
     def denormalize_image(lab_image):
@@ -76,10 +77,14 @@ class Cifar():
         return lab_image
 
     def quantize(lab_images):
-        lab_images[:, :, :, 0] = np.digitize(lab_images[:, :, :, 0], np.linspace(0, 101, 100))
-        lab_images[:, :, :, 1] = np.digitize(lab_images[:, :, :, 1], np.linspace(-88, 99, 200))
-        lab_images[:, :, :, 2] = np.digitize(lab_images[:, :, :, 2], np.linspace(-108, 95, 200))
-        return lab_images
+        lab_images[:, :, :, 0] = np.digitize(lab_images[:, :, :, 0], np.linspace(0, 101, 101)) - 1
+        lab_images[:, :, :, 1] = np.digitize(lab_images[:, :, :, 1], np.linspace(-88, 99, 21)) - 1
+        lab_images[:, :, :, 2] = np.digitize(lab_images[:, :, :, 2], np.linspace(-108, 95, 21)) - 1
+        l_labels = lab_images[:, :, :, 0]
+        ab_labels = lab_images[:, :, :, 1] * 20 + lab_images[:, :, :, 2]
+        print("L_LABELS: {0}".format(l_labels.shape))
+        print("AB_LABLES: {0}".format(ab_labels.shape))
+        return l_labels, ab_labels
 
     def convert_to_lab(self):
         self.val_images = color.rgb2lab(self.val_images)
@@ -88,8 +93,12 @@ class Cifar():
         self.test_images = color.rgb2lab(self.test_images)
         #print(self.val_images[0])
 
+        self.quantized_val_images = np.array([transform.resize(image, (16, 16)) for image in self.val_images])
+        self.quantized_train_images = np.array([transform.resize(image, (16, 16)) for image in self.train_images])
+        self.quantized_test_images = np.array([transform.resize(image, (16, 16)) for image in self.test_images])
+
         # self.quantized_val_images = Cifar.quantize(self.val_images)
-        # self.quantized_train_images = Cifar.quantize(self.train_images)
+        self.train_l_labels, self.train_ab_lables = Cifar.quantize(self.quantized_train_images)
         # self.quantized_test_images = Cifar.quantize(self.test_images)
         #print(self.quantized_val_images[0])
 
