@@ -64,16 +64,21 @@ class Cifar():
 
         #print(self.test_images.shape)
 
-    def normalize(lab_images):
-        lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / 100.0
-        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / 99.0
-        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / 108.0
+    def compute_maxs(self, lab_images):
+        self.l_max = np.amax(np.absolute(lab_images[:, :, :, 0]))
+        self.a_max = np.amax(np.absolute(lab_images[:, :, :, 1]))
+        self.b_max = np.amax(np.absolute(lab_images[:, :, :, 2]))
+
+    def normalize(self, lab_images):
+        lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / self.l_max
+        lab_images[:, :, :, 1] = lab_images[:, :, :, 1] / self.a_max
+        lab_images[:, :, :, 2] = lab_images[:, :, :, 2] / self.b_max
         return lab_images
 
     def denormalize_image(lab_image):
-        lab_image[:, :, 0] = lab_image[:, :, 0] * 100.0
-        lab_image[:, :, 1] = lab_image[:, :, 1] * 99.0
-        lab_image[:, :, 2] = lab_image[:, :, 2] * 108.0
+        lab_image[:, :, 0] = lab_image[:, :, 0] * self.l_max
+        lab_image[:, :, 1] = lab_image[:, :, 1] * self.a_max
+        lab_image[:, :, 2] = lab_image[:, :, 2] * self.b_max
         return lab_image
 
     def quantize(lab_images):
@@ -86,25 +91,37 @@ class Cifar():
         print("AB_LABLES: {0}".format(ab_labels.shape))
         return l_labels.reshape([-1, 16*16]), ab_labels.reshape([-1, 16*16])
 
+    def quantize_rgb(lab_images):
+        lab_images[:, :, :, 0] = np.digitize(lab_images[:, :, :, 0], np.linspace(0, 1.01, 101)) - 1
+        lab_images[:, :, :, 1] = np.digitize(lab_images[:, :, :, 1], np.linspace(0, 1.01, 17)) - 1
+        lab_images[:, :, :, 2] = np.digitize(lab_images[:, :, :, 2], np.linspace(0, 1.01, 17)) - 1
+        l_labels = lab_images[:, :, :, 0]
+        ab_labels = lab_images[:, :, :, 1] * 16 + lab_images[:, :, :, 2]
+        print("L_LABELS: {0}".format(l_labels.shape))
+        print("AB_LABLES: {0}".format(ab_labels.shape))
+        return l_labels.reshape([-1, 16*16]), ab_labels.reshape([-1, 16*16])  
+
     def convert_to_lab(self):
-        self.val_images = color.rgb2lab(self.val_images)
-        self.train_images = color.rgb2lab(self.train_images)
-        np.random.shuffle(self.train_images)
-        self.test_images = color.rgb2lab(self.test_images)
+        # self.val_images = color.rgb2lab(self.val_images)
+        # self.train_images = color.rgb2lab(self.train_images)
+        # np.random.shuffle(self.train_images)
+        # self.test_images = color.rgb2lab(self.test_images)
         #print(self.val_images[0])
 
-        self.quantized_val_images = np.array([transform.resize(image, (16, 16)) for image in self.val_images])
-        self.quantized_train_images = np.array([transform.resize(image, (16, 16)) for image in self.train_images])
-        self.quantized_test_images = np.array([transform.resize(image, (16, 16)) for image in self.test_images])
+        self.quantized_val_images = np.array([transform.resize(image, (16, 16), preserve_range=True) for image in self.val_images])
+        self.quantized_train_images = np.array([transform.resize(image, (16, 16), preserve_range=True) for image in self.train_images])
+        self.quantized_test_images = np.array([transform.resize(image, (16, 16), preserve_range=True) for image in self.test_images])
 
         # self.quantized_val_images = Cifar.quantize(self.val_images)
-        self.train_l_labels, self.train_ab_labels = Cifar.quantize(self.quantized_train_images)
+        self.train_l_labels, self.train_ab_labels = Cifar.quantize_rgb(self.quantized_train_images)
+        self.val_l_labels, self.val_ab_labels = Cifar.quantize_rgb(self.quantized_val_images)
+        self.test_l_labels, self.test_ab_labels = Cifar.quantize_rgb(self.quantized_test_images)
         # self.quantized_test_images = Cifar.quantize(self.test_images)
         #print(self.quantized_val_images[0])
 
-        self.val_images = Cifar.normalize(self.val_images)
-        self.train_images = Cifar.normalize(self.train_images)
-        self.test_images = Cifar.normalize(self.test_images)
+        # self.val_images = self.normalize(self.val_images)
+        # self.train_images = self.normalize(self.train_images)
+        # self.test_images = self.normalize(self.test_images)
         #print(self.val_images[0]) 
 
     def data(self, batch_size, is_supervised, percentage=None):
@@ -140,8 +157,10 @@ class Cifar():
         else:
             indices = np.random.randint(0, len(self.val_images), size=batch_size)
             x = self.val_images[indices]
+            l_labels = self.val_l_labels[indices]
+            ab_labels = self.val_ab_labels[indices]
             #plt.imshow(np.squeeze(x[0]))
-            return x
+            return x, l_labels, ab_labels
 
     def test_data(self, test_size, is_supervised):
         start = 0
@@ -155,11 +174,13 @@ class Cifar():
             print("start: {0}, end: {1}".format(start, end))
             x = self.test_images[start:end]
             y = self.test_labels[start:end]
+            l_labels = self.test_l_labels[start:end]
+            ab_labels = self.test_ab_labels[start:end]
             y = Cifar.one_hot(y, 10)
 
             if is_supervised:
                 yield x, y
             else:
-                yield x
+                yield x, l_labels, ab_labels
 
             start = end
