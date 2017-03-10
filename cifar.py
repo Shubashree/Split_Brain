@@ -102,10 +102,10 @@ class Cifar():
         return l_labels.reshape([-1, 16*16]), ab_labels.reshape([-1, 16*16])  
 
     def convert_to_lab(self):
-        # self.val_images = color.rgb2lab(self.val_images)
-        # self.train_images = color.rgb2lab(self.train_images)
-        # np.random.shuffle(self.train_images)
-        # self.test_images = color.rgb2lab(self.test_images)
+        self.val_images = color.rgb2lab(self.val_images)
+        self.train_images = color.rgb2lab(self.train_images)
+        np.random.shuffle(self.train_images)
+        self.test_images = color.rgb2lab(self.test_images)
         #print(self.val_images[0])
 
         self.quantized_val_images = np.array([transform.resize(image, (16, 16), preserve_range=True) for image in self.val_images])
@@ -113,15 +113,15 @@ class Cifar():
         self.quantized_test_images = np.array([transform.resize(image, (16, 16), preserve_range=True) for image in self.test_images])
 
         # self.quantized_val_images = Cifar.quantize(self.val_images)
-        self.train_l_labels, self.train_ab_labels = Cifar.quantize_rgb(self.quantized_train_images)
-        self.val_l_labels, self.val_ab_labels = Cifar.quantize_rgb(self.quantized_val_images)
-        self.test_l_labels, self.test_ab_labels = Cifar.quantize_rgb(self.quantized_test_images)
+        self.train_l_labels, self.train_ab_labels = Cifar.quantize(self.quantized_train_images)
+        self.val_l_labels, self.val_ab_labels = Cifar.quantize(self.quantized_val_images)
+        self.test_l_labels, self.test_ab_labels = Cifar.quantize(self.quantized_test_images)
         # self.quantized_test_images = Cifar.quantize(self.test_images)
         #print(self.quantized_val_images[0])
 
-        # self.val_images = self.normalize(self.val_images)
-        # self.train_images = self.normalize(self.train_images)
-        # self.test_images = self.normalize(self.test_images)
+        self.val_images = self.normalize(self.val_images)
+        self.train_images = self.normalize(self.train_images)
+        self.test_images = self.normalize(self.test_images)
         #print(self.val_images[0]) 
 
     def data(self, batch_size, is_supervised, percentage=None):
