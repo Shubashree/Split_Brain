@@ -49,12 +49,13 @@ def input_distortion(images, isTraining, batch_size):
 
 class Model():
 
-    def __init__(self, sess, data, val_data, test_data, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, 
+    def __init__(self, sess, data, val_data, test_data, cifar, num_iter, sup_learning_rate, uns_learning_rate_1, uns_learning_rate_2, batch_size, 
         test_size, is_supervised, is_untrained):
         self.sess = sess
         self.data = data #initialize this with Cifar.data
         self.val_data = val_data
         self.test_data = test_data
+        self.cifar = cifar
         self.num_iter = num_iter
         self.sup_learning_rate = sup_learning_rate
         self.uns_learning_rate_1 = uns_learning_rate_1
@@ -122,15 +123,23 @@ class Model():
         if not is_supervised:
             self.images = self.x
             result = self.unsupervised_arch(self.x)
+
             #L, ab, L_hat, ab_hat = (slim.layers.flatten(x) for x in result[0])
-            #self.L_reg, self.ab_reg, self.L_hat_reg, self.ab_hat_reg = (x for x in result[0])
+            self.L_reg, self.ab_reg, self.L_hat_reg, self.ab_hat_reg = (x for x in result[0])
+
             L, ab, L_hat, ab_hat = result[0]
+
+
+            self.L_hat_maxed = tf.argmax(L_hat, axis=3)
+            self.ab_hat_maxed = tf.argmax(ab_hat, axis=3)
+            self.L_hat_maxed = tf.reshape(self.L_hat_maxed, [-1, 16, 16, 1])
+            self.ab_hat_maxed = tf.reshape(self.ab_hat_maxed, [-1, 16, 16, 1])
+            #self.L_hat_reg = tf.argmax(self.L_hat_reg, axis=3)
+            #self.ab_hat_reg = tf.argmax(self.ab_hat_reg, axis=3)
             L_hat = tf.reshape(L_hat, [-1, 16*16, 100])
             ab_hat = tf.reshape(ab_hat, [-1, 16*16, 256])
             self.L = tf.placeholder(dtype=tf.int32, shape=[None, 16*16])
             self.ab = tf.placeholder(dtype=tf.int32, shape=[None, 16*16])
-            # self.L = tf.reshape(self.L, [self.batch_size, 16*16])
-            # self.ab = tf.reshape(self.ab, [self.batch_size, 16*16])
 
             self.L_labels_per_im = tf.unstack(self.L, num=self.batch_size)
             self.ab_labels_per_im = tf.unstack(self.ab, num=self.batch_size)
@@ -151,15 +160,15 @@ class Model():
             self.ab_hat_loss = self.ab_hat_loss / self.batch_size
             self.L_hat_loss = self.L_hat_loss / self.batch_size
 
-            #self.ab_hat_l2_loss = tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(tf.reduce_sum(tf.pow(tf.abs(ab - ab_hat), 2), axis=3), axis=2), axis=1))
-            #self.L_hat_l2_loss = tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(tf.pow(tf.abs(L - L_hat), 2), axis=2), axis=1))
+            # self.ab_hat_loss = tf.reduce_mean(tf.reduce_sum(tf.pow(tf.abs(ab - ab_hat), 1), axis=[3, 2, 1]))
+            # self.L_hat_loss = tf.reduce_mean(tf.reduce_sum(tf.pow(tf.abs(L - L_hat), 1), axis=[3, 2, 1]))
 
             #TensorBoard Logging:
-            # train_ab_sum = tf.summary.scalar('Unsupervised Training ab_hat L2 loss', self.ab_hat_l2_loss)
-            # train_l_sum = tf.summary.scalar('Unsupervised Training L hat L2 loss', self.L_hat_l2_loss)
+            # train_ab_sum = tf.summary.scalar('Unsupervised Training ab_hat L2 loss', self.ab_hat_loss)
+            # train_l_sum = tf.summary.scalar('Unsupervised Training L hat L2 loss', self.L_hat_loss)
 
-            # val_ab_sum = tf.summary.scalar('Unsupervised Val ab_hat L2 loss', self.ab_hat_l2_loss)
-            # val_l_sum = tf.summary.scalar('Unsupervised Val L hat L2 loss', self.L_hat_l2_loss)
+            # val_ab_sum = tf.summary.scalar('Unsupervised Val ab_hat L2 loss', self.ab_hat_loss)
+            # val_l_sum = tf.summary.scalar('Unsupervised Val L hat L2 loss', self.L_hat_loss)
 
             train_ab_sum = tf.summary.scalar('Unsupervised Training ab_hat loss', self.ab_hat_loss)
             train_l_sum = tf.summary.scalar('Unsupervised Training L hat loss', self.L_hat_loss)
@@ -210,61 +219,68 @@ class Model():
             padding='SAME',
             weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
             normalizer_fn = slim.layers.batch_norm,
-            normalizer_params = {'is_training': self.isTraining}
+            normalizer_params = {'is_training': self.isTraining},
+            variables_collections = ['unsupervised_ab_hat'],
             ):
 
             ab_hat = slim.layers.convolution(L, 32, [3, 3], scope='L_conv1') # 24 x 24 x 32
             ab_hat = slim.layers.max_pool2d(ab_hat, [2, 2]) # 12 x 12 x 32
             #ab_features = ab_hat
             ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv2') # 12 x 12 x 64
+            #ab_hat = slim.layers.max_pool2d(ab_hat, [2, 2])
             
+            ab_features = ab_hat
+
             with tf.variable_scope('L_res1'):
-                 ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
-            #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv3')
+                ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            
+            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv3')
 
             #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv4')
-            with tf.variable_scope('L_res2'):
-                ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+            # with tf.variable_scope('L_res2'):
+            #     ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
-            ab_features = ab_hat
 
             # ab_hat = slim.layers.flatten(ab_hat)
             # ab_hat = slim.layers.fully_connected(ab_hat, 16*16*400, activation_fn=None,
             #     normalizer_params = {'is_training' : self.isTraining, 'scale' : True})
 
-            ab_hat = slim.layers.convolution(ab_hat, 256, [1, 1], scope='L_conv5', activation_fn=None,
-                normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 2
+            ab_hat = slim.layers.convolution(ab_hat, 256, [1, 1], scope='L_conv5', activation_fn=None, normalizer_fn=None)
+                #normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 2
 
         with slim.arg_scope([slim.layers.convolution], 
             padding='SAME',
             weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
             normalizer_fn = slim.layers.batch_norm,
-            normalizer_params = {'is_training': self.isTraining}    
+            normalizer_params = {'is_training': self.isTraining}, 
+            variables_collections = ['unsupervised_L_hat']   
             ):
 
             L_hat = slim.layers.convolution(ab, 32, [3, 3], scope='ab_conv1') # 24 x 24 x 32
             L_hat = slim.layers.max_pool2d(L_hat, [2, 2]) # 12 x 12 x 32
             #L_features = L_hat
             L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv2') # 12 x 12 x 64
+            #L_hat = slim.layers.max_pool2d(L_hat, [2, 2])
+            L_features = L_hat
             with tf.variable_scope('ab_res1'):
                 L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
 
-            with tf.variable_scope('ab_res2'):
-                L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+            # with tf.variable_scope('ab_res2'):
+            #     L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
-            # L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv3')
+            L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv3')
 
             #L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv4')
 
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED L FEATURES ###
-            L_features = L_hat
+
 
             # L_hat = slim.layers.flatten(L_hat)
             # L_hat = slim.layers.fully_connected(L_hat, 16*16*100, activation_fn=None, 
             #     normalizer_params = {'is_training' : self.isTraining, 'scale' : True})
-            L_hat = slim.layers.convolution(L_hat, 100, [1, 1], scope='ab_conv5', activation_fn=None,
-              normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 1
+            L_hat = slim.layers.convolution(L_hat, 100, [1, 1], scope='ab_conv5', activation_fn=None, normalizer_fn=None)
+                #normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 1
 
         L = tf.image.resize_bilinear(L, [16, 16])
         ab = tf.image.resize_bilinear(ab, [16, 16])
@@ -306,27 +322,29 @@ class Model():
 
         else:
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            ab_coll = tf.get_collection('unsupervised_ab_hat')
+            L_coll = tf.get_collection('unsupervised_L_hat')
             if update_ops:
                 updates = tf.group(*update_ops)
 
                 self.optim = tf.group(updates,
                     tf.train.AdamOptimizer(
                         learning_rate=self.uns_learning_rate_1)
-                        .minimize(self.ab_hat_loss)
+                        .minimize(self.ab_hat_loss, var_list=ab_coll)
                     ,
                     tf.train.AdamOptimizer(
                         learning_rate=self.uns_learning_rate_2)
-                        .minimize(self.L_hat_loss)
+                        .minimize(self.L_hat_loss, var_list=L_coll)
                     )
             else:
                 self.optim = tf.group(
                     tf.train.AdamOptimizer(
                         learning_rate=self.uns_learning_rate_1)
-                        .minimize(self.ab_hat_loss)
+                        .minimize(self.ab_hat_loss, var_list=ab_coll)
                     ,
                     tf.train.AdamOptimizer(
                         learning_rate=self.uns_learning_rate_2)
-                        .minimize(self.L_hat_loss)
+                        .minimize(self.L_hat_loss, var_list=L_coll)
                     )
 
         self.sess.run(tf.global_variables_initializer())
@@ -354,12 +372,21 @@ class Model():
             if y:
                 raise ValueError("Do not supply labels for unsupervised training")
 
-            ab_hat_loss, L_hat_loss, _, summary, ims = self.sess.run(
-                [self.ab_hat_loss, self.L_hat_loss, self.optim, self.train_merged, self.images], 
+            L_hat_maxed, ab_hat_maxed, L_reg_e, L_hat_reg_e, ab_reg_e, ab_hat_reg_e, ab_hat_loss, L_hat_loss, _, summary, ims = self.sess.run(
+                [self.L_hat_maxed, self.ab_hat_maxed, self.L_reg, self.L_hat_reg, self.ab_reg, self.ab_hat_reg, self.ab_hat_loss, self.L_hat_loss, self.optim, self.train_merged, self.images], 
                 feed_dict = {self.x: x, self.L: L_labels, self.ab: ab_labels, self.isTraining: True}
                 )
-            
+
+            if iteration % 50 == 0:
+                plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
+            #     #plt.imshow(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))
+                plt.show()
+                plt.imshow(color.lab2rgb(self.cifar.dequantize(np.concatenate((L_hat_maxed[0], ab_hat_maxed[0]), axis=2).astype(int)).astype(np.float64)))
+            #     #plt.imshow(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2).astype(np.float64))
+                plt.show() 
+
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
+            print("L_HAT_MAXED shape: {0}, AB_HAT_MAXED_shape: {1}".format(L_hat_maxed.shape, ab_hat_maxed.shape))
             self.log_writer.add_summary(summary, iteration)
             # print(np.amin(ims[0]), np.amax(ims[0]))
             # plt.imshow(color.lab2rgb(ims[0]))
@@ -391,8 +418,8 @@ class Model():
     def test(self):
         if not self.is_supervised:
             for x, L_labels, ab_labels in self.test_data(self.test_size, self.is_supervised):
-                ab_hat_loss, l_hat_loss = self.sess.run(
-                    [self.ab_hat_loss, self.L_hat_loss],
+                L_reg_e, L_hat_reg_e, ab_reg_e, ab_hat_reg_e, ab_hat_loss, l_hat_loss = self.sess.run(
+                    [self.L_reg, self.L_hat_reg, self.ab_reg, self.ab_hat_reg, self.ab_hat_loss, self.L_hat_loss],
                     feed_dict={self.x : x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False}
                     )
                 print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
@@ -400,10 +427,12 @@ class Model():
                 # print("L_HAT_REG_E", L_hat_reg_e[0])
                 # print("AB_REG_E", ab_reg_e[0])
                 # print("AB_HAT_REG_E", ab_hat_reg_e[0])
-                #plt.imshow(color.lab2rgb(Cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2))))
-                #plt.show()
-                #plt.imshow(color.lab2rgb(Cifar.denormalize_image(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2))))
-                #plt.show() 
+                # plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
+                # #plt.imshow(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))
+                # plt.show()
+                # plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2)).astype(np.float64)))
+                # #plt.imshow(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2).astype(np.float64))
+                # plt.show() 
 
         if self.is_supervised:
             total_corr = 0
@@ -428,15 +457,15 @@ class Model():
                 #     self.test()
 
             else:
-                x, l_labels, ab_labels = self.data(self.batch_size, self.is_supervised)
+                x, L_labels, ab_labels = self.data(self.batch_size, self.is_supervised)
                 # print("X: min: {0}, max: {1}".format(np.amin(x[0]), np.amax(x[0])))
                 # plt.imshow((color.lab2rgb(x[0])))
                 # plt.show()
-                self.train_iter(iteration, x, y=None, L_labels=l_labels, ab_labels=ab_labels)
+                self.train_iter(iteration, x, L_labels=L_labels, ab_labels=ab_labels)
 
                 if iteration % 100 == 0:
-                    x, l_labels, ab_labels = self.val_data(self.batch_size, self.is_supervised)
-                    self.info_iter(iteration, x, y=None, L_labels=l_labels, ab_labels=ab_labels)
+                    x, L_labels, ab_labels = self.val_data(self.batch_size, self.is_supervised)
+                    self.info_iter(iteration, x, L_labels=L_labels, ab_labels=ab_labels)
 
                 # if iteration % 1000 == 0:
                 #     self.test()
