@@ -213,17 +213,18 @@ class Model():
             normalizer_params = {'is_training': self.isTraining}
             ):
 
-            ab_hat = slim.layers.convolution(L, 32, [3, 3], scope='L_conv1') # 24 x 24 x 32
+            ab_hat = slim.layers.convolution(L, 64, [3, 3], scope='L_conv1') # 24 x 24 x 32
             ab_hat = slim.layers.max_pool2d(ab_hat, [2, 2]) # 12 x 12 x 32
             #ab_features = ab_hat
-            ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv2') # 12 x 12 x 64
-            # with tf.variable_scope('L_res1'):
-            #      ab_hat = residual(ab_hat, 256, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
-            ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv3')
+            ab_hat = slim.layers.convolution(ab_hat, 128, [3, 3], scope='L_conv2') # 12 x 12 x 64
+            
+            with tf.variable_scope('L_res1'):
+                 ab_hat = residual(ab_hat, 128, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv3')
 
             #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv4')
-            # with tf.variable_scope('L_res2'):
-            #     ab_hat = residual(ab_hat, 256, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+            with tf.variable_scope('L_res2'):
+                ab_hat = residual(ab_hat, 128, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
             ab_features = ab_hat
@@ -242,17 +243,17 @@ class Model():
             normalizer_params = {'is_training': self.isTraining}    
             ):
 
-            L_hat = slim.layers.convolution(ab, 32, [3, 3], scope='ab_conv1') # 24 x 24 x 32
+            L_hat = slim.layers.convolution(ab, 64, [3, 3], scope='ab_conv1') # 24 x 24 x 32
             L_hat = slim.layers.max_pool2d(L_hat, [2, 2]) # 12 x 12 x 32
             #L_features = L_hat
-            L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv2') # 12 x 12 x 64
-            # with tf.variable_scope('ab_res1'):
-            #     L_hat = residual(L_hat, 256, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            L_hat = slim.layers.convolution(L_hat, 128, [3, 3], scope='ab_conv2') # 12 x 12 x 64
+            with tf.variable_scope('ab_res1'):
+                L_hat = residual(L_hat, 128, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
 
-            # with tf.variable_scope('ab_res2'):
-            #     L_hat = residual(L_hat, 256, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+            with tf.variable_scope('ab_res2'):
+                L_hat = residual(L_hat, 128, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
-            L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv3')
+            # L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv3')
 
             #L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv4')
 
