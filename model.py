@@ -213,18 +213,18 @@ class Model():
             normalizer_params = {'is_training': self.isTraining}
             ):
 
-            ab_hat = slim.layers.convolution(L, 64, [3, 3], scope='L_conv1') # 24 x 24 x 32
+            ab_hat = slim.layers.convolution(L, 32, [3, 3], scope='L_conv1') # 24 x 24 x 32
             ab_hat = slim.layers.max_pool2d(ab_hat, [2, 2]) # 12 x 12 x 32
             #ab_features = ab_hat
-            ab_hat = slim.layers.convolution(ab_hat, 128, [3, 3], scope='L_conv2') # 12 x 12 x 64
+            ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv2') # 12 x 12 x 64
             
             with tf.variable_scope('L_res1'):
-                 ab_hat = residual(ab_hat, 128, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+                 ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
             #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv3')
 
             #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv4')
             with tf.variable_scope('L_res2'):
-                ab_hat = residual(ab_hat, 128, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+                ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
             ab_features = ab_hat
@@ -243,15 +243,15 @@ class Model():
             normalizer_params = {'is_training': self.isTraining}    
             ):
 
-            L_hat = slim.layers.convolution(ab, 64, [3, 3], scope='ab_conv1') # 24 x 24 x 32
+            L_hat = slim.layers.convolution(ab, 32, [3, 3], scope='ab_conv1') # 24 x 24 x 32
             L_hat = slim.layers.max_pool2d(L_hat, [2, 2]) # 12 x 12 x 32
             #L_features = L_hat
-            L_hat = slim.layers.convolution(L_hat, 128, [3, 3], scope='ab_conv2') # 12 x 12 x 64
+            L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv2') # 12 x 12 x 64
             with tf.variable_scope('ab_res1'):
-                L_hat = residual(L_hat, 128, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+                L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
 
             with tf.variable_scope('ab_res2'):
-                L_hat = residual(L_hat, 128, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+                L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
             # L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv3')
 
@@ -365,7 +365,7 @@ class Model():
             # plt.imshow(color.lab2rgb(ims[0]))
             # plt.show()
 
-    def info_iter(self, iteration, x, y=None):
+    def info_iter(self, iteration, x, y=None, L_labels=None, ab_labels=None):
         if self.is_supervised:
             if y is None:
                 raise ValueError("Must supply labels for supervised training")
@@ -383,17 +383,17 @@ class Model():
 
             ab_hat_loss, L_hat_loss, summary = self.sess.run(
                 [self.ab_hat_loss, self.L_hat_loss, self.val_merged],
-                feed_dict = {self.x: x, self.isTraining: False}
+                feed_dict = {self.x: x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False}
                 )
             print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
 
     def test(self):
         if not self.is_supervised:
-            for x in self.test_data(self.test_size, self.is_supervised):
+            for x, L_labels, ab_labels in self.test_data(self.test_size, self.is_supervised):
                 ab_hat_loss, l_hat_loss = self.sess.run(
                     [self.ab_hat_loss, self.L_hat_loss],
-                    feed_dict={self.x : x, self.isTraining: False}
+                    feed_dict={self.x : x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False}
                     )
                 print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
                 # print("L_REG_E", L_reg_e[0])
@@ -434,8 +434,9 @@ class Model():
                 # plt.show()
                 self.train_iter(iteration, x, y=None, L_labels=l_labels, ab_labels=ab_labels)
 
-                # if iteration % 100 == 0:
-                #     self.info_iter(iteration, x)
+                if iteration % 100 == 0:
+                    x, l_labels, ab_labels = self.val_data(self.batch_size, self.is_supervised)
+                    self.info_iter(iteration, x, y=None, L_labels=l_labels, ab_labels=ab_labels)
 
                 # if iteration % 1000 == 0:
                 #     self.test()
