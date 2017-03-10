@@ -193,7 +193,7 @@ class Model():
 
         with tf.variable_scope('Supervised'):
             with slim. arg_scope([slim.layers.convolution, slim.layers.fully_connected],
-                weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
+                #weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
                 normalizer_fn = slim.layers.batch_norm,
                 normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'], 'scale': True},
                 variables_collections = ['supervised_var_coll']
@@ -217,13 +217,15 @@ class Model():
 
         with slim.arg_scope([slim.layers.convolution], 
             padding='SAME',
-            weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
+            #weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
             normalizer_fn = slim.layers.batch_norm,
             normalizer_params = {'is_training': self.isTraining},
             variables_collections = ['unsupervised_ab_hat'],
+            activation_fn=tf.nn.elu
             ):
 
-            ab_hat = slim.layers.convolution(L, 32, [3, 3], scope='L_conv1') # 24 x 24 x 32
+            ab_hat = slim.layers.convolution(L, 64, [3, 3], scope='L_conv1') # 24 x 24 x 32
+            ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv4')
             ab_hat = slim.layers.max_pool2d(ab_hat, [2, 2]) # 12 x 12 x 32
             #ab_features = ab_hat
             ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv2') # 12 x 12 x 64
@@ -231,8 +233,8 @@ class Model():
             
             ab_features = ab_hat
 
-            with tf.variable_scope('L_res1'):
-                ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            # with tf.variable_scope('L_res1'):
+            #     ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
             
             ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv3')
 
@@ -240,13 +242,19 @@ class Model():
             # with tf.variable_scope('L_res2'):
             #     ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
+            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv_5')
+
+            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv6')
+
+            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv7')
+
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
 
             # ab_hat = slim.layers.flatten(ab_hat)
             # ab_hat = slim.layers.fully_connected(ab_hat, 16*16*400, activation_fn=None,
             #     normalizer_params = {'is_training' : self.isTraining, 'scale' : True})
 
-            ab_hat = slim.layers.convolution(ab_hat, 256, [1, 1], scope='L_conv5', activation_fn=None, normalizer_fn=None)
+            ab_hat = slim.layers.convolution(ab_hat, 256, [1, 1], scope='L_conv8', activation_fn=None, normalizer_fn=None)
                 #normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 2
 
         with slim.arg_scope([slim.layers.convolution], 
@@ -254,24 +262,30 @@ class Model():
             weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
             normalizer_fn = slim.layers.batch_norm,
             normalizer_params = {'is_training': self.isTraining}, 
-            variables_collections = ['unsupervised_L_hat']   
+            variables_collections = ['unsupervised_L_hat'],
+            activation_fn=tf.nn.elu   
             ):
 
-            L_hat = slim.layers.convolution(ab, 32, [3, 3], scope='ab_conv1') # 24 x 24 x 32
+            L_hat = slim.layers.convolution(ab, 64, [3, 3], scope='ab_conv1') # 24 x 24 x 32
+            L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv4')
             L_hat = slim.layers.max_pool2d(L_hat, [2, 2]) # 12 x 12 x 32
             #L_features = L_hat
             L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv2') # 12 x 12 x 64
             #L_hat = slim.layers.max_pool2d(L_hat, [2, 2])
             L_features = L_hat
-            with tf.variable_scope('ab_res1'):
-                L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            # with tf.variable_scope('ab_res1'):
+            #     L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
 
             # with tf.variable_scope('ab_res2'):
             #     L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
-            L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv3')
+            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv3')
 
-            #L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv4')
+            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv8')
+
+            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv6')
+
+            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv7')
 
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED L FEATURES ###
 
@@ -286,6 +300,30 @@ class Model():
         ab = tf.image.resize_bilinear(ab, [16, 16])
 
         return [(L, ab, L_hat, ab_hat), images, L_features, ab_features]
+
+    def count_variables(self):
+        variables1 = tf.get_collection('unsupervised_ab_hat')
+        variables2 = tf.get_collection('unsupervised_L_hat')
+
+        count = 0
+        for variable in variables1:
+            print(variable.get_shape().as_list())
+            shape = variable.get_shape().as_list()
+            local_count = 1
+            for item in shape:
+                local_count *= item
+            count += local_count
+
+        for variable in variables2:
+            print(variable.get_shape().as_list())
+            shape = variable.get_shape().as_list()
+            local_count = 1
+            for item in shape:
+                local_count *= item
+            count += local_count
+
+        print(count)
+
 
     def train_init(self):
         if self.is_supervised:
@@ -378,6 +416,7 @@ class Model():
                 )
 
             if iteration % 50 == 0:
+                print(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2)))
                 plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
             #     #plt.imshow(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))
                 plt.show()
