@@ -127,10 +127,10 @@ class Model():
             L, ab, L_hat, ab_hat = result[0]
             L_hat = tf.reshape(L_hat, [-1, 16*16, 100])
             ab_hat = tf.reshape(ab_hat, [-1, 16*16, 256])
-            self.L = tf.placeholder(dtype=tf.int32, shape=[None, 16, 16])
-            self.ab = tf.placeholder(dtype=tf.int32, shape=[None, 16, 16])
-            self.L = tf.reshape(self.L, [-1, 16*16])
-            self.ab = tf.reshape(self.ab, [-1, 16*16])
+            self.L = tf.placeholder(dtype=tf.int32, shape=[None, 16*16])
+            self.ab = tf.placeholder(dtype=tf.int32, shape=[None, 16*16])
+            # self.L = tf.reshape(self.L, [self.batch_size, 16*16])
+            # self.ab = tf.reshape(self.ab, [self.batch_size, 16*16])
 
             self.L_labels_per_im = tf.unstack(self.L, num=self.batch_size)
             self.ab_labels_per_im = tf.unstack(self.ab, num=self.batch_size)
@@ -193,7 +193,7 @@ class Model():
                 #result = residual(result, 32, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(self.total_features)
                 result = slim.layers.fully_connected(result, 1024, weights_regularizer=tf.contrib.layers.l2_regularizer(1e-8))
-                #result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
+                result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
                 result = slim.layers.fully_connected(result, 10, activation_fn=None, normalizer_fn=None)
 
         return result
@@ -364,55 +364,55 @@ class Model():
             # plt.imshow(color.lab2rgb(ims[0]))
             # plt.show()
 
-    # def info_iter(self, iteration, x, y=None):
-    #     if self.is_supervised:
-    #         if y is None:
-    #             raise ValueError("Must supply labels for supervised training")
+    def info_iter(self, iteration, x, y=None):
+        if self.is_supervised:
+            if y is None:
+                raise ValueError("Must supply labels for supervised training")
 
-    #         loss, reg_loss, accuracy, summary = self.sess.run(
-    #             [self.sup_loss, self.reg_loss, self.accuracy, self.val_merged],
-    #             feed_dict = {self.x: x, self.y: y, self.isTraining: False}
-    #             )
+            loss, reg_loss, accuracy, summary = self.sess.run(
+                [self.sup_loss, self.reg_loss, self.accuracy, self.val_merged],
+                feed_dict = {self.x: x, self.y: y, self.isTraining: False}
+                )
 
-    #         print('SUP-- VAL: loss:{0}, reg_loss: {3}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
-    #         self.log_writer.add_summary(summary, iteration)
-    #     else:
-    #         if y:
-    #             raise ValueError("Do not supply labels for unsupervised training")
+            print('SUP-- VAL: loss:{0}, reg_loss: {3}, accuracy: {1}, ITERATION: {2}'.format(loss, accuracy, iteration, reg_loss))
+            self.log_writer.add_summary(summary, iteration)
+        else:
+            if y:
+                raise ValueError("Do not supply labels for unsupervised training")
 
-    #         ab_hat_loss, L_hat_loss, summary = self.sess.run(
-    #             [self.ab_hat_loss, self.L_hat_loss, self.val_merged],
-    #             feed_dict = {self.x: x, self.isTraining: False}
-    #             )
-    #         print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
-    #         self.log_writer.add_summary(summary, iteration)
+            ab_hat_loss, L_hat_loss, summary = self.sess.run(
+                [self.ab_hat_loss, self.L_hat_loss, self.val_merged],
+                feed_dict = {self.x: x, self.isTraining: False}
+                )
+            print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
+            self.log_writer.add_summary(summary, iteration)
 
-    # def test(self):
-    #     if not self.is_supervised:
-    #         for x in self.test_data(self.test_size, self.is_supervised):
-    #             ab_hat_loss, l_hat_loss = self.sess.run(
-    #                 [self.ab_hat_loss, self.L_hat_loss],
-    #                 feed_dict={self.x : x, self.isTraining: False}
-    #                 )
-    #             print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
-    #             # print("L_REG_E", L_reg_e[0])
-    #             # print("L_HAT_REG_E", L_hat_reg_e[0])
-    #             # print("AB_REG_E", ab_reg_e[0])
-    #             # print("AB_HAT_REG_E", ab_hat_reg_e[0])
-    #             #plt.imshow(color.lab2rgb(Cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2))))
-    #             #plt.show()
-    #             #plt.imshow(color.lab2rgb(Cifar.denormalize_image(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2))))
-    #             #plt.show() 
+    def test(self):
+        if not self.is_supervised:
+            for x in self.test_data(self.test_size, self.is_supervised):
+                ab_hat_loss, l_hat_loss = self.sess.run(
+                    [self.ab_hat_loss, self.L_hat_loss],
+                    feed_dict={self.x : x, self.isTraining: False}
+                    )
+                print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
+                # print("L_REG_E", L_reg_e[0])
+                # print("L_HAT_REG_E", L_hat_reg_e[0])
+                # print("AB_REG_E", ab_reg_e[0])
+                # print("AB_HAT_REG_E", ab_hat_reg_e[0])
+                #plt.imshow(color.lab2rgb(Cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2))))
+                #plt.show()
+                #plt.imshow(color.lab2rgb(Cifar.denormalize_image(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2))))
+                #plt.show() 
 
-    #     if self.is_supervised:
-    #         total_corr = 0
-    #         for x, y in self.test_data(self.test_size, self.is_supervised):
-    #             total_corr += self.sess.run(
-    #                 self.total_corr,
-    #                 feed_dict={self.x: x, self.y: y, self.isTraining: False}
-    #                 )
-    #             print(total_corr)
-    #         print("TEST ACCURACY: {0}".format(total_corr*100/10000))
+        if self.is_supervised:
+            total_corr = 0
+            for x, y in self.test_data(self.test_size, self.is_supervised):
+                total_corr += self.sess.run(
+                    self.total_corr,
+                    feed_dict={self.x: x, self.y: y, self.isTraining: False}
+                    )
+                print(total_corr)
+            print("TEST ACCURACY: {0}".format(total_corr*100/10000))
 
     def train(self):
         for iteration in range(self.num_iter):
@@ -420,8 +420,8 @@ class Model():
                 x, y= self.data(self.batch_size, self.is_supervised, self.sup_percentage)
                 self.train_iter(iteration, x, y)
 
-                # if iteration % 100 == 0:
-                #     self.info_iter(iteration, x, y)
+                if iteration % 100 == 0:
+                    self.info_iter(iteration, x, y)
 
                 # if iteration % 1000 == 0:
                 #     self.test()
