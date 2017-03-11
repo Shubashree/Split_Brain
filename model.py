@@ -217,7 +217,7 @@ class Model():
 
         with slim.arg_scope([slim.layers.convolution], 
             padding='SAME',
-            #weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
+            weights_initializer = tf.contrib.layers.variance_scaling_initializer(),
             normalizer_fn = slim.layers.batch_norm,
             normalizer_params = {'is_training': self.isTraining},
             variables_collections = ['unsupervised_ab_hat'],
@@ -233,27 +233,26 @@ class Model():
             
             ab_features = ab_hat
 
-            # with tf.variable_scope('L_res1'):
-            #     ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            with tf.variable_scope('L_res1'):
+                ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
             
-            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv3')
+            #ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv3')
+            #ab_hat = slim.layers.dropout(ab_hat, keep_prob=0.5, is_training=self.isTraining)
 
             #ab_hat = slim.layers.convolution(ab_hat, 64, [3, 3], scope='L_conv4')
-            # with tf.variable_scope('L_res2'):
-            #     ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+            with tf.variable_scope('L_res2'):
+                ab_hat = residual(ab_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
             ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv_5')
 
-            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv6')
-
-            ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv7')
+            #ab_hat = slim.layers.convolution(ab_hat, 256, [3, 3], scope='L_conv6')
 
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED AB FEATURES ###
 
             # ab_hat = slim.layers.flatten(ab_hat)
             # ab_hat = slim.layers.fully_connected(ab_hat, 16*16*400, activation_fn=None,
             #     normalizer_params = {'is_training' : self.isTraining, 'scale' : True})
-
+            #ab_hat = slim.layers.dropout(ab_hat, keep_prob=0.5, is_training=self.isTraining)
             ab_hat = slim.layers.convolution(ab_hat, 256, [1, 1], scope='L_conv8', activation_fn=None, normalizer_fn=None)
                 #normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 2
 
@@ -273,26 +272,25 @@ class Model():
             L_hat = slim.layers.convolution(L_hat, 64, [3, 3], scope='ab_conv2') # 12 x 12 x 64
             #L_hat = slim.layers.max_pool2d(L_hat, [2, 2])
             L_features = L_hat
-            # with tf.variable_scope('ab_res1'):
-            #     L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
+            with tf.variable_scope('ab_res1'):
+                L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, True, False) # 12 x 12 x 64
 
-            # with tf.variable_scope('ab_res2'):
-            #     L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
+            with tf.variable_scope('ab_res2'):
+                L_hat = residual(L_hat, 64, [3, 3], 0.7, self.isTraining, False, True) # 12 x 12 x 64
 
             L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv3')
+            #L_hat = slim.layers.dropout(L_hat, keep_prob=0.5, is_training=self.isTraining)
 
-            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv8')
+            #L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv8')
 
-            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv6')
-
-            L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv7')
-
+            #L_hat = slim.layers.convolution(L_hat, 256, [3, 3], scope='ab_conv6')
             ### PUT THIS LINE WHERE YOU WANT TO EXTRACT SUPERVISED L FEATURES ###
 
 
             # L_hat = slim.layers.flatten(L_hat)
             # L_hat = slim.layers.fully_connected(L_hat, 16*16*100, activation_fn=None, 
             #     normalizer_params = {'is_training' : self.isTraining, 'scale' : True})
+            #L_hat = slim.layers.dropout(L_hat, keep_prob=0.5, is_training=self.isTraining)
             L_hat = slim.layers.convolution(L_hat, 100, [1, 1], scope='ab_conv5', activation_fn=None, normalizer_fn=None)
                 #normalizer_params = {'is_training' : self.isTraining, 'scale' : True}) # 12 x 12 x 1
 
@@ -409,10 +407,12 @@ class Model():
         else:
             if y:
                 raise ValueError("Do not supply labels for unsupervised training")
-
             L_hat_maxed, ab_hat_maxed, L_reg_e, L_hat_reg_e, ab_reg_e, ab_hat_reg_e, ab_hat_loss, L_hat_loss, _, summary, ims = self.sess.run(
+            #L_reg_e, L_hat_reg_e, ab_reg_e, ab_hat_reg_e, ab_hat_loss, L_hat_loss, _, summary, ims = self.sess.run(
+                #[self.L_reg, self.L_hat_reg, self.ab_reg, self.ab_hat_reg, self.ab_hat_loss, self.L_hat_loss, self.optim, self.train_merged, self.images],
                 [self.L_hat_maxed, self.ab_hat_maxed, self.L_reg, self.L_hat_reg, self.ab_reg, self.ab_hat_reg, self.ab_hat_loss, self.L_hat_loss, self.optim, self.train_merged, self.images], 
                 feed_dict = {self.x: x, self.L: L_labels, self.ab: ab_labels, self.isTraining: True}
+                #feed_dict = {self.x: x, self.isTraining: True}
                 )
 
             if iteration % 50 == 0:
@@ -421,11 +421,11 @@ class Model():
             #     #plt.imshow(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))
                 plt.show()
                 plt.imshow(color.lab2rgb(self.cifar.dequantize(np.concatenate((L_hat_maxed[0], ab_hat_maxed[0]), axis=2).astype(int)).astype(np.float64)))
-            #     #plt.imshow(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2).astype(np.float64))
+                #plt.imshow(np.concatenate((L_hat_reg_e[0], ab_hat_reg_e[0]), axis=2).astype(np.float64))
                 plt.show() 
 
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
-            print("L_HAT_MAXED shape: {0}, AB_HAT_MAXED_shape: {1}".format(L_hat_maxed.shape, ab_hat_maxed.shape))
+            #print("L_HAT_MAXED shape: {0}, AB_HAT_MAXED_shape: {1}".format(L_hat_maxed.shape, ab_hat_maxed.shape))
             self.log_writer.add_summary(summary, iteration)
             # print(np.amin(ims[0]), np.amax(ims[0]))
             # plt.imshow(color.lab2rgb(ims[0]))
@@ -450,6 +450,7 @@ class Model():
             ab_hat_loss, L_hat_loss, summary = self.sess.run(
                 [self.ab_hat_loss, self.L_hat_loss, self.val_merged],
                 feed_dict = {self.x: x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False}
+                #feed_dict = {self.x: x, self.isTraining: False}
                 )
             print('VAL: ab_hat_l2_loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
@@ -459,7 +460,8 @@ class Model():
             for x, L_labels, ab_labels in self.test_data(self.test_size, self.is_supervised):
                 L_reg_e, L_hat_reg_e, ab_reg_e, ab_hat_reg_e, ab_hat_loss, l_hat_loss = self.sess.run(
                     [self.L_reg, self.L_hat_reg, self.ab_reg, self.ab_hat_reg, self.ab_hat_loss, self.L_hat_loss],
-                    feed_dict={self.x : x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False}
+                    feed_dict={self.x : x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False},
+                    #feed_dict={self.x : x, self.isTraining: False}
                     )
                 print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
                 # print("L_REG_E", L_reg_e[0])

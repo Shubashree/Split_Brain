@@ -65,11 +65,13 @@ class Cifar():
         #print(self.test_images.shape)
 
     def compute_maxs(self, lab_images):
-        self.l_max = np.amax(np.absolute(lab_images[:, :, :, 0]))
-        self.a_max = np.amax(np.absolute(lab_images[:, :, :, 1]))
-        self.b_max = np.amax(np.absolute(lab_images[:, :, :, 2]))
+        self.l_max = np.amax(lab_images[:, :, :, 0])
+        self.a_max = np.amax(lab_images[:, :, :, 1])
+        self.b_max = np.amax(lab_images[:, :, :, 2])
         self.a_min = np.abs(np.amin(lab_images[:, :, :, 1]))
         self.b_min = np.abs(np.amin(lab_images[:, :, :, 2]))
+        print("MAX: {0}, MIN: {1}".format(self.a_max, self.a_min))
+        print("MAX: {0}, MIN: {1}".format(self.b_max, self.b_min))
 
     def normalize(self, lab_images):
         lab_images[:, :, :, 0] = lab_images[:, :, :, 0] / self.l_max
