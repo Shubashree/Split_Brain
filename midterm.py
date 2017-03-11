@@ -6,7 +6,6 @@ from cifar import Cifar
 from model import Model
 
 cifar_data = Cifar('../hw3/cifar10')
-#cifar_data.compute_maxs(cifar_data.train_images)
 cifar_data.convert_to_lab()
 
 sess = tf.Session()
@@ -22,13 +21,12 @@ model = Model(
 	uns_learning_rate_2=1e-2,
 	batch_size=16,
 	test_size=16,
-	is_supervised=False,
-	is_untrained=True
+	is_supervised=True,
+	is_untrained=False
 	)
 
 model.count_variables()
-#model.change_sup_percentage(10)
+model.change_sup_percentage(10)
 model.train_init()
 model.train()
-# # model.saver.restore(model.sess, './saved_uns_model/model.ckpt')
 model.test()
