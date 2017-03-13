@@ -3,6 +3,7 @@
 Implementation of [Split-Brain Autoencoders: Unsupervised Learning by Cross-Channel Prediction] (https://arxiv.org/abs/1611.09842) by Zhang et al
 
 cifar.py - 
+
   -Imports CIFAR-10 data
   
   -Converts from RGB colorspace to LAB colorspace
