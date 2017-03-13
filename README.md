@@ -17,7 +17,9 @@ Implementation of [Split-Brain Autoencoders: Unsupervised Learning by Cross-Chan
 ## midterm.py
 * Serves as the test bench
 
-## Results
+Plots taken periodically during training of unsupervised model indicate adequate capturing of shape and color. Pre-trained linear classifier trained on 10% of training dataset performed marginally better than the untrained version. 
+
+Results indicate that under situations with a dearth in labelled data, extracting features using the unsupervised Split Brain Autoencoder can help. 
 
 
 
