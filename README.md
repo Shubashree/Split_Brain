@@ -1,5 +1,6 @@
-# Deep_Learning_Midterm
-midterm for Deep Learning
+# Split Brain Autoencoder
+
+Implementation of [Split-Brain Autoencoders: Unsupervised Learning by Cross-Channel Prediction by Zhang et al] (https://arxiv.org/abs/1611.09842)
 
 Training a Split-Brain Autoencoder on CIFAR-10 images.
 
