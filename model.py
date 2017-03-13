@@ -172,15 +172,15 @@ class Model():
         with tf.variable_scope('Supervised'):
             with slim. arg_scope([slim.layers.convolution, slim.layers.fully_connected],
                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(),
-                normalizer_fn = slim.layers.batch_norm,
-                normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'], 'scale': True},
+                #normalizer_fn = slim.layers.batch_norm,
+                #normalizer_params = {'is_training': self.isTraining, 'updates_collections': ['supervised_update_coll'], 'scale': True},
                 variables_collections = ['supervised_var_coll']
                 ):
-                result = slim.layers.convolution(self.total_features, 32, [3, 3], scope='S_conv1') # 12 x 12 x 64
-                result = residual(result, 32, [3, 3], 0.5, self.isTraining, True, True)
+                #result = slim.layers.convolution(self.total_features, 32, [3, 3], scope='S_conv1') # 12 x 12 x 64
+                #result = residual(result, 32, [3, 3], 0.5, self.isTraining, True, True)
                 result = slim.layers.flatten(self.total_features)
-                result = slim.layers.fully_connected(result, 1024, weights_regularizer=tf.contrib.layers.l2_regularizer(1e-8))
-                result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
+                #result = slim.layers.fully_connected(result, 1024, weights_regularizer=tf.contrib.layers.l2_regularizer(1e-8))
+                #result = slim.layers.dropout(result, keep_prob=0.5, is_training=self.isTraining)
                 result = slim.layers.fully_connected(result, 10, activation_fn=None, normalizer_fn=None)
 
         return result
@@ -377,12 +377,15 @@ class Model():
                 feed_dict = {self.x: x, self.L: L_labels, self.ab: ab_labels, self.isTraining: True}
                 )
 
-            if iteration % 50 == 0:
-                print(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2)))
-                plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
-                plt.show()
-                plt.imshow(color.lab2rgb(self.cifar.dequantize(np.concatenate((L_hat_maxed[0], ab_hat_maxed[0]), axis=2).astype(int)).astype(np.float64)))
-                plt.show() 
+            #if iteration % 1000 == 0:
+                #print(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2)))
+                #plt.subplot(1,2,1)
+                #plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
+                #plt.title('Real Image')
+                #plt.imshow(color.lab2rgb(self.cifar.dequantize(np.concatenate((L_hat_maxed[0], ab_hat_maxed[0]), axis=2).astype(int)).astype(np.float64)))
+                #plt.title('Colorized Image')
+                #plt.tight_layout()
+                #plt.savefig('train_'+str(iteration)+'.pdf', format='pdf', bbox_inches='tight')
 
             print('ab_hat_l2loss: {0}, L_hat_l2_loss: {1}, ITERATION: {2}'.format(ab_hat_loss, L_hat_loss, iteration))
             self.log_writer.add_summary(summary, iteration)
@@ -413,16 +416,21 @@ class Model():
 
     def test(self):
         if not self.is_supervised:
-            for x, L_labels, ab_labels in self.test_data(self.test_size, self.is_supervised):
+            for idx, (x, L_labels, ab_labels) in enumerate(self.test_data(self.test_size, self.is_supervised)):
                 L_hat_maxed, ab_hat_maxed, L_reg_e, L_hat_reg_e, ab_reg_e, ab_hat_reg_e, ab_hat_loss, l_hat_loss = self.sess.run(
                     [self.L_hat_maxed, self.ab_hat_maxed, self.L_reg, self.L_hat_reg, self.ab_reg, self.ab_hat_reg, self.ab_hat_loss, self.L_hat_loss],
                     feed_dict={self.x : x, self.L: L_labels, self.ab: ab_labels, self.isTraining: False},
                     )
                 print("TEST AB LOSS: {0}, TEST L LOSS : {1}".format(ab_hat_loss, l_hat_loss))
-                plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
-                plt.show()
-                plt.imshow(color.lab2rgb(self.cifar.dequantize(np.concatenate((L_hat_maxed[0], ab_hat_maxed[0]), axis=2).astype(int)).astype(np.float64)))
-                plt.show()
+                #if idx == 1000:
+                    #plt.subplot(1,2,1)
+                    #plt.imshow(color.lab2rgb(self.cifar.denormalize_image(np.concatenate((L_reg_e[0], ab_reg_e[0]), axis=2).astype(np.float64))))
+                    #plt.title('Real Image')
+                    #plt.subplot(1,2,2)
+                    #plt.imshow(color.lab2rgb(self.cifar.dequantize(np.concatenate((L_hat_maxed[0], ab_hat_maxed[0]), axis=2).astype(int)).astype(np.float64)))
+                    #plt.title('Colorized Image')
+                    #plt.tight_layout()
+                    #plt.savefig('test_'+str(idx)+'.pdf', format='pdf', bbox_inches='tight')
 
         if self.is_supervised:
             total_corr = 0
@@ -440,7 +448,7 @@ class Model():
                 x, y= self.data(self.batch_size, self.is_supervised, self.sup_percentage)
                 self.train_iter(iteration, x, y)
 
-                if iteration % 100 == 0:
+                if iteration % 1000 == 0:
                     self.info_iter(iteration, x, y)
 
                 # if iteration % 1000 == 0:
@@ -451,7 +459,7 @@ class Model():
 
                 self.train_iter(iteration, x, L_labels=L_labels, ab_labels=ab_labels)
 
-                if iteration % 100 == 0:
+                if iteration % 1000 == 0:
                     x, L_labels, ab_labels = self.val_data(self.batch_size, self.is_supervised)
                     self.info_iter(iteration, x, L_labels=L_labels, ab_labels=ab_labels)
 

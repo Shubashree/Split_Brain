@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from cifar import Cifar
 from model import Model
 
-cifar_data = Cifar('../hw3/cifar10')
+cifar_data = Cifar('../../../cifar-10-batches-py/cifar-10-batches-py')
 cifar_data.convert_to_lab()
 
 sess = tf.Session()
@@ -15,7 +15,7 @@ model = Model(
 	val_data = cifar_data.val_data,
 	test_data = cifar_data.test_data,
 	cifar=cifar_data,
-	num_iter=3000,
+	num_iter=10000,
 	sup_learning_rate=1e-2,
 	uns_learning_rate_1=1e-2,
 	uns_learning_rate_2=1e-2,
