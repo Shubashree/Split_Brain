@@ -1,8 +1,11 @@
 # Split Brain Autoencoder
 
-Implementation of [Split-Brain Autoencoders: Unsupervised Learning by Cross-Channel Prediction by Zhang et al] (https://arxiv.org/abs/1611.09842)
+Implementation of [Split-Brain Autoencoders: Unsupervised Learning by Cross-Channel Prediction] (https://arxiv.org/abs/1611.09842) by Zhang et al
 
-Training a Split-Brain Autoencoder on CIFAR-10 images.
+cifar.py - 
+  -Imports CIFAR-10 data
+  -Converts from RGB colorspace to LAB colorspace
+  -Normalizes each channel to [0,1]
+  -Quantized, or Binned, each channel in order to train under classification loss. "L" quantized to 100 bins, and "ab" quantized to a 16x16 grid
 
-Unsupervised training: loss function compares prediction with a 12x12 downsampled version of the original image.
-Supervised training: keeping a subset of the layers fully trained via unsupervised learning, and then training additional layers via supervised learning (using a subset of the data).
+
